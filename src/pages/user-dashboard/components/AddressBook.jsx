@@ -4,6 +4,7 @@ import { useToast } from '../../../components/ui/ToastProvider';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
+import Modal from '../../../components/ui/Modal';
 
 const AddressBook = () => {
   const toast = useToast();
@@ -79,6 +80,7 @@ const AddressBook = () => {
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({ isOpen: false, addressId: null, addressName: '' });
 
   const addressTypes = {
     home: { label: 'Nhà riêng', icon: 'Home', color: 'text-accent' },
@@ -166,7 +168,7 @@ const AddressBook = () => {
     const previous = addresses || [];
     let nextAddresses;
     if (editingId) {
-      nextAddresses = previous.map(addr => addr?.id === editingId ? { ...formData, id: editingId } : addr);
+      nextAddresses = previous.map(addr => addr?.id === editingId ? { ...formData, id: editingId, _id: addr._id || addr.id } : addr);
       // optimistic UI update
       setAddresses(nextAddresses);
     } else {
@@ -178,6 +180,17 @@ const AddressBook = () => {
 
     setSaving(true);
     try {
+      // ensure single default address: if new/edited address has isDefault true, unset others
+      const hasDefault = nextAddresses.some(a => a.isDefault);
+      if (hasDefault) {
+        nextAddresses = nextAddresses.map(a => ({ ...a, isDefault: !!a.isDefault }));
+        // if multiple were set somehow, prefer the last one
+        let found = false;
+        nextAddresses = nextAddresses.map(a => {
+          if (a.isDefault && !found) { found = true; return a; }
+          return { ...a, isDefault: false };
+        });
+      }
       // convert to server-friendly shape before sending
       const payload = nextAddresses.map(a => mapToServerAddress(a));
       await API.put('/api/auth/me', { addresses: payload });
@@ -330,23 +343,53 @@ const AddressBook = () => {
   }, [locations]);
 
   const handleDelete = (addressId) => {
-    setAddresses(prev => {
-      const next = prev?.filter(addr => addr?.id !== addressId);
-      (async () => {
-        try { await API.put('/api/auth/me', { addresses: next.map(a => mapToServerAddress(a)) }); } catch (e) { console.error(e); }
-      })();
-      return next;
+    console.log('handleDelete called with id:', addressId);
+    const address = addresses.find(addr => addr?.id === addressId);
+    const addressName = address ? `${address.name} - ${address.address}` : 'địa chỉ này';
+    setDeleteConfirmModal({ 
+      isOpen: true, 
+      addressId, 
+      addressName 
     });
   };
 
+  const confirmDelete = async () => {
+    const addressId = deleteConfirmModal.addressId;
+    console.log('confirmDelete for id:', addressId);
+    const previous = addresses || [];
+    const next = previous.filter(addr => addr?.id !== addressId);
+    // optimistic UI update
+    setAddresses(next);
+    try {
+      await API.put('/api/auth/me', { addresses: next.map(a => mapToServerAddress(a)) });
+      toast.push({ title: 'Thành công', message: 'Đã xóa địa chỉ', type: 'success' });
+    } catch (e) {
+      console.error(e);
+      // revert optimistic update
+      setAddresses(previous);
+      toast.push({ title: 'Lỗi', message: 'Không thể xóa địa chỉ', type: 'error' });
+    } finally {
+      setDeleteConfirmModal({ isOpen: false, addressId: null, addressName: '' });
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmModal({ isOpen: false, addressId: null, addressName: '' });
+  };
+
   const handleSetDefault = (addressId) => {
-    setAddresses(prev => {
-      const next = prev?.map(addr => ({ ...addr, isDefault: addr?.id === addressId }));
-      (async () => {
-        try { await API.put('/api/auth/me', { addresses: next.map(a => mapToServerAddress(a)) }); } catch (e) { console.error(e); }
-      })();
-      return next;
-    });
+    const previous = addresses || [];
+    const next = previous?.map(addr => ({ ...addr, isDefault: addr?.id === addressId }));
+    setAddresses(next);
+    (async () => {
+      try {
+        await API.put('/api/auth/me', { addresses: next.map(a => mapToServerAddress(a)) });
+      } catch (e) {
+        console.error(e);
+        setAddresses(previous);
+        toast.push({ title: 'Lỗi', message: 'Không thể cập nhật địa chỉ mặc định', type: 'error' });
+      }
+    })();
   };
 
   const handleCancel = () => {
@@ -604,6 +647,36 @@ const AddressBook = () => {
           </Button>
         </div>
       )}
+
+      {/* Confirmation Modal for Delete */}
+      <Modal 
+        open={deleteConfirmModal.isOpen} 
+        onClose={cancelDelete}
+        title="Xác nhận xóa địa chỉ"
+      >
+        <div className="space-y-4">
+          <p className="text-foreground">
+            Bạn có chắc chắn muốn xóa địa chỉ <strong>{deleteConfirmModal.addressName}</strong> không?
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Hành động này không thể hoàn tác.
+          </p>
+          <div className="flex space-x-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={cancelDelete}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+            >
+              Xóa địa chỉ
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
