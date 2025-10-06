@@ -300,7 +300,7 @@ const ProductDetail = () => {
   const handleAddToWishlist = () => {
     (async () => {
       try {
-        await API.post('/api/wishlist/add', { productId: mockProduct.id, snapshot: { name: mockProduct.name, image: mockProduct?.image, price: mockProduct.salePrice } });
+        await API.post('/api/wishlist/add', { product_id: mockProduct.id, snapshot: { name: mockProduct.name, image: mockProduct?.image, price: mockProduct.salePrice } });
         toast.push({ title: 'Đã thêm', message: 'Đã thêm sản phẩm vào danh sách yêu thích!', type: 'success' });
       } catch (e) {
         const msg = e?.response?.data?.message || 'Không thể thêm vào danh sách yêu thích';

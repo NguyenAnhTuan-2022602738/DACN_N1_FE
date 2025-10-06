@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
-import API from '../../../lib/api';
+import ConfirmModal from '../../../components/ui/ConfirmModal';
 import { useToast } from '../../../components/ui/ToastProvider';
+import { useWishlist } from '../../../contexts/WishlistContext';
 
 const WishlistSection = () => {
-  const [wishlistItems, setWishlistItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-
+  const toast = useToast();
+  const { wishlistItems, removeFromWishlist, refreshWishlist, isLoading } = useWishlist();
   const [selectedItems, setSelectedItems] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // grid or list
-  const toast = useToast();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -28,40 +31,46 @@ const WishlistSection = () => {
     });
   };
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await API.get('/api/wishlist');
-        const items = (res?.data?.items || []).map(i => ({
-          id: i.productId,
-          name: i.snapshot?.name || `Sản phẩm ${i.productId}`,
-          image: i.snapshot?.image,
-          price: i.snapshot?.price || 0,
-          addedDate: i.addedAt
-        }));
-        if (mounted) setWishlistItems(items);
-      } catch (e) {
-        // ignore, keep empty
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+  // Map wishlist items from context to display format
+  const displayItems = wishlistItems.map(item => ({
+    id: item.product_id?.toString() || item._id?.toString(),
+    name: item.snapshot?.name || 'Sản phẩm',
+    brand: item.snapshot?.brand,
+    image: item.snapshot?.image,
+    price: item.snapshot?.price || 0,
+    originalPrice: item.snapshot?.originalPrice,
+    category: item.snapshot?.category,
+    addedDate: item.created_at || item.createdAt
+  }));
 
+  // Handle remove single item
   const handleRemoveItem = (itemId) => {
-    (async () => {
-      try {
-        await API.post('/api/wishlist/remove', { productId: itemId });
-        setWishlistItems(prev => prev?.filter(item => item?.id !== itemId));
-        setSelectedItems(prev => prev?.filter(id => id !== itemId));
-      } catch (e) {
-        // fallback local removal
-        setWishlistItems(prev => prev?.filter(item => item?.id !== itemId));
-        setSelectedItems(prev => prev?.filter(id => id !== itemId));
-      }
-    })();
+    setItemToDelete(itemId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmRemoveItem = async () => {
+    if (!itemToDelete) return;
+
+    try {
+      await removeFromWishlist(itemToDelete);
+      setSelectedItems(prev => prev?.filter(id => id !== itemToDelete));
+      toast.push({
+        title: 'Đã xóa',
+        message: 'Đã xóa sản phẩm khỏi danh sách yêu thích',
+        type: 'success'
+      });
+    } catch (e) {
+      console.error('Remove item error:', e);
+      toast.push({
+        title: 'Lỗi',
+        message: 'Không thể xóa sản phẩm',
+        type: 'error'
+      });
+    } finally {
+      setShowDeleteConfirm(false);
+      setItemToDelete(null);
+    }
   };
 
   const handleSelectItem = (itemId) => {
@@ -73,27 +82,42 @@ const WishlistSection = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedItems?.length === wishlistItems?.length) {
+    if (selectedItems?.length === displayItems?.length) {
       setSelectedItems([]);
     } else {
-      setSelectedItems(wishlistItems?.map(item => item?.id));
+      setSelectedItems(displayItems?.map(item => item?.id));
     }
   };
 
   const handleRemoveSelected = () => {
-    (async () => {
-      try {
-        await Promise.all(selectedItems.map(id => API.post('/api/wishlist/remove', { productId: id })));
-        setWishlistItems(prev => prev?.filter(item => !selectedItems?.includes(item?.id)));
-        setSelectedItems([]);
-        toast.push({ title: 'Đã xóa', message: 'Đã xóa sản phẩm khỏi yêu thích', type: 'success' });
-      } catch (e) {
-        // fallback local
-        setWishlistItems(prev => prev?.filter(item => !selectedItems?.includes(item?.id)));
-        setSelectedItems([]);
-        toast.push({ title: 'Lỗi', message: 'Không thể xóa một vài mục', type: 'error' });
-      }
-    })();
+    setShowDeleteAllConfirm(true);
+  };
+
+  const confirmRemoveSelected = async () => {
+    if (selectedItems.length === 0) return;
+
+    try {
+      // Remove all selected items
+      await Promise.all(
+        selectedItems.map(itemId => removeFromWishlist(itemId))
+      );
+      
+      setSelectedItems([]);
+      toast.push({
+        title: 'Đã xóa',
+        message: `Đã xóa ${selectedItems.length} sản phẩm khỏi danh sách yêu thích`,
+        type: 'success'
+      });
+    } catch (e) {
+      console.error('Remove selected error:', e);
+      toast.push({
+        title: 'Lỗi',
+        message: 'Không thể xóa một số sản phẩm',
+        type: 'error'
+      });
+    } finally {
+      setShowDeleteAllConfirm(false);
+    }
   };
 
   const handleAddToCart = (item) => {
@@ -107,76 +131,86 @@ const WishlistSection = () => {
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
-        <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-          <h2 className="text-xl font-semibold text-foreground">Danh sách yêu thích</h2>
-          <span className="bg-accent/10 text-accent px-2 py-1 rounded-full text-sm font-medium">
-            {wishlistItems?.length} sản phẩm
-          </span>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          {/* View Mode Toggle */}
-          <div className="flex border border-border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="px-3"
-            >
-              <Icon name="Grid3X3" size={16} />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="px-3"
-            >
-              <Icon name="List" size={16} />
-            </Button>
+    <>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+          <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+            <h2 className="text-xl font-semibold text-foreground">Danh sách yêu thích</h2>
+            <span className="bg-accent/10 text-accent px-2 py-1 rounded-full text-sm font-medium">
+              {displayItems?.length} sản phẩm
+            </span>
           </div>
           
-          {/* Bulk Actions */}
-          {wishlistItems?.length > 0 && (
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2">
+            {/* View Mode Toggle */}
+            <div className="flex border border-border rounded-lg p-1">
               <Button
-                variant="outline"
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={handleSelectAll}
+                onClick={() => setViewMode('grid')}
+                className="px-3"
               >
-                {selectedItems?.length === wishlistItems?.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                <Icon name="Grid3X3" size={16} />
               </Button>
-              
-              {selectedItems?.length > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  iconName="Trash2"
-                  iconPosition="left"
-                  onClick={handleRemoveSelected}
-                >
-                  Xóa ({selectedItems?.length})
-                </Button>
-              )}
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="px-3"
+              >
+                <Icon name="List" size={16} />
+              </Button>
             </div>
-          )}
+            
+            {/* Bulk Actions */}
+            {displayItems?.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                >
+                  {selectedItems?.length === displayItems?.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                </Button>
+                
+                {selectedItems?.length > 0 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    iconName="Trash2"
+                    iconPosition="left"
+                    onClick={handleRemoveSelected}
+                  >
+                    Xóa ({selectedItems?.length})
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      {wishlistItems?.length === 0 ? (
-        <div className="text-center py-12">
-          <Icon name="Heart" size={48} className="mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">Danh sách yêu thích trống</h3>
-          <p className="text-muted-foreground mb-4">Hãy thêm những sản phẩm bạn yêu thích để dễ dàng theo dõi</p>
-          <Button variant="default" iconName="ShoppingBag" iconPosition="left">
-            Khám phá sản phẩm
-          </Button>
-        </div>
-      ) : (
-        <div className={viewMode === 'grid' 
-          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" :"space-y-4"
-        }>
-          {wishlistItems?.map((item) => (
+
+        {isLoading ? (
+          <div className="text-center py-12">
+            <Icon name="Loader2" size={48} className="mx-auto text-muted-foreground mb-4 animate-spin" />
+            <p className="text-muted-foreground">Đang tải danh sách yêu thích...</p>
+          </div>
+        ) : displayItems?.length === 0 ? (
+          <div className="text-center py-12">
+            <Icon name="Heart" size={48} className="mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">Danh sách yêu thích trống</h3>
+            <p className="text-muted-foreground mb-4">Hãy thêm những sản phẩm bạn yêu thích để dễ dàng theo dõi</p>
+            <Link to="/product-catalog">
+              <Button variant="default" iconName="ShoppingBag" iconPosition="left">
+                Khám phá sản phẩm
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className={viewMode === 'grid' 
+            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
+            : "space-y-4"
+          }>
+            {displayItems?.map((item) => (
             <div
               key={item?.id}
               className={`border border-border rounded-lg overflow-hidden hover:shadow-elegant transition-smooth ${
@@ -274,6 +308,34 @@ const WishlistSection = () => {
         </div>
       )}
     </div>
+
+    {/* Confirm Delete Single Item Modal */}
+    <ConfirmModal
+      isOpen={showDeleteConfirm}
+      onClose={() => {
+        setShowDeleteConfirm(false);
+        setItemToDelete(null);
+      }}
+      onConfirm={confirmRemoveItem}
+      title="Xóa sản phẩm?"
+      message="Bạn có chắc chắn muốn xóa sản phẩm này khỏi danh sách yêu thích?"
+      type="danger"
+      confirmText="Xóa"
+      cancelText="Hủy"
+    />
+
+    {/* Confirm Delete Selected Items Modal */}
+    <ConfirmModal
+      isOpen={showDeleteAllConfirm}
+      onClose={() => setShowDeleteAllConfirm(false)}
+      onConfirm={confirmRemoveSelected}
+      title="Xóa các sản phẩm đã chọn?"
+      message={`Bạn có chắc chắn muốn xóa ${selectedItems.length} sản phẩm đã chọn khỏi danh sách yêu thích?`}
+      type="danger"
+      confirmText="Xóa tất cả"
+      cancelText="Hủy"
+    />
+  </>
   );
 };
 

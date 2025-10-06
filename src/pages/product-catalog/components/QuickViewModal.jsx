@@ -55,6 +55,21 @@ const QuickViewModal = ({ product, isOpen, onClose, onAddToCart, onWishlistToggl
 
   const handleWishlistToggle = () => {
     onWishlistToggle(product?.id);
+    
+    // Show toast notification
+    if (product?.isWishlisted) {
+      toast.push({
+        title: 'Đã xóa',
+        message: 'Đã xóa sản phẩm khỏi danh sách yêu thích',
+        type: 'info'
+      });
+    } else {
+      toast.push({
+        title: 'Đã thêm vào yêu thích!',
+        message: `"${product?.name}" đã được thêm vào danh sách yêu thích`,
+        type: 'success'
+      });
+    }
   };
 
   const discount = calculateDiscount();

@@ -3,15 +3,20 @@ import { Link } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
+import { useWishlist } from '../../../contexts/WishlistContext';
 
 const ProductCard = ({ product, onWishlistToggle, onQuickView, onAddToCart }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const { isInWishlist } = useWishlist();
+
+  // Check if product is in wishlist
+  const isWishlisted = isInWishlist(product?._id || product?.id);
 
   const handleWishlistClick = (e) => {
     e?.preventDefault();
     e?.stopPropagation();
-    onWishlistToggle(product?.id);
+    onWishlistToggle(product?.id || product?._id);
   };
 
   const handleQuickView = (e) => {
@@ -104,13 +109,13 @@ const ProductCard = ({ product, onWishlistToggle, onQuickView, onAddToCart }) =>
               size="sm"
               onClick={handleWishlistClick}
               className={`w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-sm ${
-                product?.isWishlisted ? 'text-error' : 'text-foreground'
+                isWishlisted ? 'text-error' : 'text-foreground'
               }`}
             >
               <Icon 
-                name={product?.isWishlisted ? "Heart" : "Heart"} 
+                name="Heart" 
                 size={16}
-                className={product?.isWishlisted ? 'fill-current' : ''}
+                className={isWishlisted ? 'fill-current' : ''}
               />
             </Button>
             

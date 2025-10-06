@@ -13,9 +13,11 @@ import baseProducts from '../../data/products';
 import cart from '../../lib/cart';
 import API from '../../lib/api';
 import { useToast } from '../../components/ui/ToastProvider';
+import { useWishlist } from '../../contexts/WishlistContext';
 
 const ProductCatalog = () => {
   const toast = useToast();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -211,14 +213,49 @@ const ProductCatalog = () => {
   };
 
   // Handle wishlist toggle
-  const handleWishlistToggle = (productId) => {
-    setProducts(prev =>
-      prev?.map(product =>
-        product?.id === productId
-          ? { ...product, isWishlisted: !product?.isWishlisted }
-          : product
-      )
-    );
+  const handleWishlistToggle = async (productId) => {
+    const product = products.find(p => p?.id === productId || p?._id === productId);
+    if (!product) {
+      console.error('[Wishlist] Product not found:', productId);
+      return;
+    }
+
+    // Use _id if available, otherwise use id
+    const finalProductId = product?._id || product?.id;
+
+    try {
+      // Use wishlist context to toggle
+      const wasAdded = await toggleWishlist(finalProductId, {
+        name: product?.name,
+        brand: product?.brand,
+        image: product?.images?.[0] || product?.image,
+        price: product?.price || product?.salePrice,
+        originalPrice: product?.originalPrice,
+        category: product?.category
+      });
+
+      // Show toast
+      if (wasAdded) {
+        toast.push({
+          title: 'Đã thêm vào yêu thích!',
+          message: `"${product?.name}" đã được thêm vào danh sách yêu thích`,
+          type: 'success'
+        });
+      } else {
+        toast.push({
+          title: 'Đã xóa',
+          message: 'Đã xóa sản phẩm khỏi danh sách yêu thích',
+          type: 'info'
+        });
+      }
+    } catch (e) {
+      console.error('[Wishlist Error]', e.response?.data || e.message);
+      toast.push({
+        title: 'Lỗi!',
+        message: e.response?.data?.message || 'Không thể cập nhật danh sách yêu thích',
+        type: 'error'
+      });
+    }
   };
 
   // Handle quick view

@@ -5,11 +5,13 @@ import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
 import { useToast } from '../../../components/ui/ToastProvider';
 import cart from '../../../lib/cart';
+import API from '../../../lib/api';
 
 const ProductCarousel = ({ title, subtitle, products, sectionId }) => {
   const toast = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [wishlistedProducts, setWishlistedProducts] = useState([]);
   const carouselRef = useRef(null);
   const itemsPerView = 4;
 
@@ -33,6 +35,57 @@ const ProductCarousel = ({ title, subtitle, products, sectionId }) => {
       toast.push({
         title: 'Lỗi!',
         message: 'Không thể thêm sản phẩm vào giỏ hàng',
+        type: 'error'
+      });
+    }
+  };
+
+  const handleWishlistToggle = async (product, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const isWishlisted = wishlistedProducts.includes(product.id);
+    
+    // Optimistically update UI
+    setWishlistedProducts(prev => 
+      isWishlisted 
+        ? prev.filter(id => id !== product.id)
+        : [...prev, product.id]
+    );
+
+    try {
+      if (isWishlisted) {
+        await API.post('/api/wishlist/remove', { product_id: product.id });
+        toast.push({
+          title: 'Đã xóa',
+          message: 'Đã xóa sản phẩm khỏi danh sách yêu thích',
+          type: 'info'
+        });
+      } else {
+        await API.post('/api/wishlist/add', {
+          product_id: product.id,
+          snapshot: {
+            name: product.name,
+            image: product.image,
+            price: product.salePrice || product.price
+          }
+        });
+        toast.push({
+          title: 'Đã thêm vào yêu thích!',
+          message: `"${product.name}" đã được thêm vào danh sách yêu thích`,
+          type: 'success'
+        });
+      }
+    } catch (e) {
+      // Revert on error
+      setWishlistedProducts(prev => 
+        isWishlisted 
+          ? [...prev, product.id]
+          : prev.filter(id => id !== product.id)
+      );
+      toast.push({
+        title: 'Lỗi!',
+        message: 'Không thể cập nhật danh sách yêu thích',
         type: 'error'
       });
     }
@@ -145,8 +198,19 @@ const ProductCarousel = ({ title, subtitle, products, sectionId }) => {
 
                     {/* Quick Actions */}
                     <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <button className="w-8 h-8 bg-background/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-accent hover:text-accent-foreground transition-colors">
-                        <Icon name="Heart" size={16} />
+                      <button 
+                        onClick={(e) => handleWishlistToggle(product, e)}
+                        className={`w-8 h-8 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ${
+                          wishlistedProducts.includes(product.id)
+                            ? 'bg-red-500 text-white hover:bg-red-600'
+                            : 'bg-background/90 hover:bg-accent hover:text-accent-foreground'
+                        }`}
+                      >
+                        <Icon 
+                          name="Heart" 
+                          size={16} 
+                          className={wishlistedProducts.includes(product.id) ? 'fill-current' : ''}
+                        />
                       </button>
                       <button className="w-8 h-8 bg-background/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-accent hover:text-accent-foreground transition-colors">
                         <Icon name="Eye" size={16} />

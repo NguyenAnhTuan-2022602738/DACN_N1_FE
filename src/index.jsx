@@ -5,6 +5,7 @@ import { Provider } from 'react-redux'
 import App from "./App";
 import store from './store'
 import { ToastProvider } from './components/ui/ToastProvider';
+import { WishlistProvider } from './contexts/WishlistContext';
 import "./styles/tailwind.css";
 import "./styles/index.css";
 
@@ -16,7 +17,9 @@ root.render(
 		<Provider store={store}>
 			<BrowserRouter>
 				<ToastProvider>
-					<App />
+					<WishlistProvider>
+						<App />
+					</WishlistProvider>
 				</ToastProvider>
 			</BrowserRouter>
 		</Provider>

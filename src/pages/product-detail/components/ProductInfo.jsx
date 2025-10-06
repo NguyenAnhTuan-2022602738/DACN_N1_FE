@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import cart from '../../../lib/cart';
+import API from '../../../lib/api';
 import { useToast } from '../../../components/ui/ToastProvider';
+import { useWishlist } from '../../../contexts/WishlistContext';
 import Icon from '../../../components/AppIcon';
 
-const ProductInfo = ({ product }) => {
+const ProductInfo = ({ product, onAddToWishlist }) => {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const toast = useToast();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
+  // Check if product is in wishlist
+  const isWishlisted = isInWishlist(product?._id || product?.id);
 
   const sizes = product?.sizes || [];
   const colors = product?.colors || [];
@@ -88,6 +94,49 @@ const ProductInfo = ({ product }) => {
     }
   };
 
+  const handleWishlistToggle = async () => {
+    const finalProductId = product?._id || product?.id;
+
+    try {
+      // Use wishlist context
+      const wasAdded = await toggleWishlist(finalProductId, {
+        name: product?.name,
+        brand: product?.brand,
+        image: product?.images?.[0]?.image_url || product?.images?.[0] || product?.image,
+        price: product?.price,
+        originalPrice: product?.originalPrice,
+        category: product?.category
+      });
+
+      // Show toast
+      if (wasAdded) {
+        toast.push({
+          title: 'Đã thêm vào yêu thích!',
+          message: `"${product?.name}" đã được thêm vào danh sách yêu thích`,
+          type: 'success'
+        });
+      } else {
+        toast.push({
+          title: 'Đã xóa',
+          message: 'Đã xóa sản phẩm khỏi danh sách yêu thích',
+          type: 'info'
+        });
+      }
+      
+      // Also call parent callback if provided
+      if (onAddToWishlist) {
+        onAddToWishlist();
+      }
+    } catch (error) {
+      console.error('[ProductInfo Wishlist Error]', error.response?.data || error.message);
+      toast.push({
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể cập nhật danh sách yêu thích',
+        type: 'error'
+      });
+    }
+  };
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -108,8 +157,23 @@ const ProductInfo = ({ product }) => {
               <p className="text-sm text-gray-500 mt-2">SKU: {product.sku}</p>
             )}
           </div>
-          <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-            <Icon name="Heart" size={24} className="text-gray-400 hover:text-red-500" />
+          <button 
+            onClick={handleWishlistToggle}
+            className={`p-3 rounded-full transition-all duration-200 ${
+              isWishlisted 
+                ? 'bg-red-50 hover:bg-red-100' 
+                : 'hover:bg-gray-100'
+            }`}
+          >
+            <Icon 
+              name="Heart" 
+              size={24} 
+              className={`transition-colors ${
+                isWishlisted 
+                  ? 'text-red-500 fill-current' 
+                  : 'text-gray-400 hover:text-red-500'
+              }`}
+            />
           </button>
         </div>
         

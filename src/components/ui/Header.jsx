@@ -4,11 +4,15 @@ import Icon from '../AppIcon';
 import Button from './Button';
 import API, { API_ENABLED } from '../../lib/api';
 import cart from '../../lib/cart';
+import { useWishlist } from '../../contexts/WishlistContext';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const location = useLocation();
+
+  // Use Wishlist Context
+  const { count: wishlistCount } = useWishlist();
 
   const primaryNavItems = [
     { name: 'Trang chủ', path: '/homepage', icon: 'Home' },
@@ -42,10 +46,6 @@ const Header = () => {
   const [cartTotal, setCartTotal] = useState(0);
   const [apiCartEnabled, setApiCartEnabled] = useState(false);
   const cartRef = useRef(null);
-
-  // Wishlist state
-  const [wishlistItems, setWishlistItems] = useState([]);
-  const [wishlistCount, setWishlistCount] = useState(0);
 
   const parseCartFromStorage = () => {
     try {
@@ -85,46 +85,10 @@ const Header = () => {
     }
   };
 
-  const parseWishlistFromStorage = () => {
-    try {
-      const raw = typeof window !== 'undefined' && localStorage.getItem('wishlist');
-      if (!raw) return { items: [], count: 0 };
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return { items: parsed, count: parsed.length };
-      const items = parsed.items || [];
-      const count = typeof parsed.count === 'number' ? parsed.count : items.length;
-      return { items, count };
-    } catch (e) { return { items: [], count: 0 }; }
-  };
-
-  const refreshWishlist = async () => {
-    // try API first if available
-    if (!API_ENABLED) {
-      const { items, count } = parseWishlistFromStorage();
-      setWishlistItems(items);
-      setWishlistCount(count);
-      return;
-    }
-    try {
-      const res = await API.get('/api/wishlist');
-      const data = res?.data || {};
-      const items = data.items || data || [];
-      const count = typeof data.count === 'number' ? data.count : (Array.isArray(items) ? items.length : 0);
-      setWishlistItems(items);
-      setWishlistCount(count);
-      return;
-    } catch (e) {
-      // fallback to localStorage
-      const { items, count } = parseWishlistFromStorage();
-      setWishlistItems(items);
-      setWishlistCount(count);
-    }
-  };
-
   useEffect(() => {
     // initial load
-  refreshCart();
-  refreshWishlist();
+    refreshCart();
+    // No need to refreshWishlist - WishlistContext handles it
 
     const onStorage = (e) => {
       if (!e) return;
@@ -336,7 +300,11 @@ const Header = () => {
 
             <Link to="/user-dashboard/wishlist" className="relative inline-flex items-center px-2 py-1">
               <Icon name="Heart" size={20} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center">{wishlistCount}</span>
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center">
+                  {wishlistCount}
+                </span>
+              )}
               <span className="sr-only">Wishlist</span>
             </Link>
 
@@ -453,9 +421,13 @@ const Header = () => {
 
               {/* Mobile Actions */}
               <div className="flex items-center justify-center space-x-4 pt-3 border-t border-border mt-3">
-                <Link to="/wishlist" className="relative inline-flex items-center px-2 py-1">
+                <Link to="/user-dashboard/wishlist" className="relative inline-flex items-center px-2 py-1">
                   <Icon name="Heart" size={20} />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center">{wishlistCount}</span>
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center">
+                      {wishlistCount}
+                    </span>
+                  )}
                   <span className="sr-only">Wishlist</span>
                 </Link>
 
