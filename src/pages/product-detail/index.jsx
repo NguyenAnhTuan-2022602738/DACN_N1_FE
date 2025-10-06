@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux'
-import { addItem } from '../../store/slices/cartSlice'
+import cart from '../../lib/cart'
 import { useSearchParams } from 'react-router-dom';
 import Header from '../../components/ui/Header';
 import ProductImageGallery from './components/ProductImageGallery';
@@ -11,14 +10,16 @@ import RelatedProducts from './components/RelatedProducts';
 import StylingTips from './components/StylingTips';
 import RecentlyViewed from './components/RecentlyViewed';
 import Icon from '../../components/AppIcon';
+import API from '../../lib/api';
 import { useToast } from '../../components/ui/ToastProvider';
 
 const ProductDetail = () => {
   const [searchParams] = useSearchParams();
   const productId = searchParams?.get('id') || '1';
   const [isLoading, setIsLoading] = useState(true);
+  const [product, setProduct] = useState(null);
 
-  // Mock product data
+  // keep a small mock product as fallback for UI pieces that expect the old shape
   const mockProduct = {
     id: productId,
     name: "Áo Sơ Mi Nữ Tay Dài Phong Cách Hàn Quốc",
@@ -231,28 +232,81 @@ const ProductDetail = () => {
     }
   ];
 
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+  // map server product to UI-friendly shape
+  const mapServerProductToUI = (p) => {
+    if (!p) return null;
+    
+    // Extract sizes and colors from variants
+    const sizes = [];
+    const colors = [];
+    const sizeAvailability = {};
+    
+    if (p.variants && Array.isArray(p.variants)) {
+      p.variants.forEach(variant => {
+        if (variant.name === 'Size') {
+          sizes.push(variant.value);
+          sizeAvailability[variant.value] = variant.stock_quantity > 0;
+        } else if (variant.name === 'Color') {
+          colors.push({ name: variant.value, code: '#dddddd' }); // You can enhance this with actual color codes
+        }
+      });
+    }
+    
+    // Fallback to old format if variants not present
+    const fallbackColors = (p.colors || []).map(c => ({ name: c, code: '#dddddd' }));
+    const fallbackSizes = p.sizes || [];
+    fallbackSizes.forEach(s => { sizeAvailability[s] = true; });
+    
+    return {
+      ...p,
+      id: p._id || p.id || p.sku,
+      salePrice: p.price,
+      originalPrice: p.original_price || p.price,
+      images: (p.images || []).map(img => img.image_url || img),
+      colors: colors.length > 0 ? colors : fallbackColors,
+      sizes: sizes.length > 0 ? sizes : fallbackSizes,
+      sizeAvailability: Object.keys(sizeAvailability).length > 0 ? sizeAvailability : { 'S': true, 'M': true, 'L': true }
+    };
+  };
 
-    return () => clearTimeout(timer);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setIsLoading(true);
+        const res = await API.get(`/api/products/${productId}`);
+        const p = res?.data?.product;
+        if (p && mounted) setProduct(mapServerProductToUI(p));
+      } catch (e) {
+        // ignore, keep null
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [productId]);
 
-  const dispatch = useDispatch()
   const toast = useToast();
 
-  const handleAddToCart = (productData) => {
-    console.log('Dispatching addItem:', productData)
-    dispatch(addItem(productData))
-    toast.push({ title: 'Thành công', message: 'Đã thêm sản phẩm vào giỏ hàng!', type: 'success' })
+  const handleAddToCart = async (productData) => {
+    try {
+      await cart.addItem(productData);
+      toast.push({ title: 'Thành công', message: 'Đã thêm sản phẩm vào giỏ hàng!', type: 'success' })
+    } catch (e) {
+      toast.push({ title: 'Lỗi', message: 'Không thể thêm sản phẩm vào giỏ hàng', type: 'error' })
+    }
   }
 
   const handleAddToWishlist = () => {
-    console.log('Adding to wishlist:', mockProduct);
-    // Add to wishlist logic here
-    toast.push({ title: 'Đã thêm', message: 'Đã thêm sản phẩm vào danh sách yêu thích!', type: 'success' })
+    (async () => {
+      try {
+        await API.post('/api/wishlist/add', { productId: mockProduct.id, snapshot: { name: mockProduct.name, image: mockProduct?.image, price: mockProduct.salePrice } });
+        toast.push({ title: 'Đã thêm', message: 'Đã thêm sản phẩm vào danh sách yêu thích!', type: 'success' });
+      } catch (e) {
+        const msg = e?.response?.data?.message || 'Không thể thêm vào danh sách yêu thích';
+        toast.push({ title: 'Lỗi', message: msg, type: 'error' });
+      }
+    })();
   };
 
   if (isLoading) {
@@ -298,11 +352,11 @@ const ProductDetail = () => {
           {/* Main Product Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             <ProductImageGallery 
-              images={mockImages} 
-              productName={mockProduct?.name} 
+              images={(product?.images && product.images.length) ? product.images : mockImages} 
+              productName={(product || mockProduct)?.name} 
             />
             <ProductInfo 
-              product={mockProduct}
+              product={product || mockProduct}
               onAddToCart={handleAddToCart}
               onAddToWishlist={handleAddToWishlist}
             />
@@ -310,22 +364,22 @@ const ProductDetail = () => {
 
           {/* Product Details Tabs */}
           <div className="mb-12">
-            <ProductTabs product={mockProduct} />
+            <ProductTabs product={product || mockProduct} />
           </div>
 
           {/* Reviews Section */}
           <div className="mb-12">
             <ReviewsSection 
               reviews={mockReviews}
-              averageRating={mockProduct?.rating}
-              totalReviews={mockProduct?.reviewCount}
+              averageRating={(product || mockProduct)?.rating}
+              totalReviews={(product || mockProduct)?.reviewCount}
             />
           </div>
 
           {/* Styling Tips */}
           <div className="mb-12">
             <StylingTips 
-              product={mockProduct}
+              product={product || mockProduct}
               stylingTips={mockStylingTips}
             />
           </div>
@@ -345,9 +399,9 @@ const ProductDetail = () => {
       <div className="fixed bottom-4 right-4 lg:hidden">
         <button
           onClick={() => handleAddToCart({
-            ...mockProduct,
+            ...(product || mockProduct),
             selectedSize: 'M',
-            selectedColor: mockProduct?.colors?.[0],
+            selectedColor: (product || mockProduct)?.colors?.[0],
             quantity: 1
           })}
           className="w-14 h-14 bg-accent text-accent-foreground rounded-full shadow-elegant flex items-center justify-center transition-smooth hover:scale-105"

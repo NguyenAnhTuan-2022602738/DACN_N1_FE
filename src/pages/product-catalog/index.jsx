@@ -9,8 +9,13 @@ import ProductGrid from './components/ProductGrid';
 import QuickViewModal from './components/QuickViewModal';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import baseProducts from '../../data/products';
+import cart from '../../lib/cart';
+import API from '../../lib/api';
+import { useToast } from '../../components/ui/ToastProvider';
 
 const ProductCatalog = () => {
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -32,174 +37,50 @@ const ProductCatalog = () => {
     material: []
   });
 
-  // Mock product data
-  const mockProducts = [
-    {
-      id: 1,
-      name: "Áo sơ mi nam Oxford trắng",
-      brand: "Zara",
-      price: 890000,
-      originalPrice: 1200000,
-      rating: 4.5,
-      reviewCount: 128,
-      images: [
-        "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400",
-        "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400",
-        "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400"
-      ],
-      availableSizes: ["S", "M", "L", "XL"],
-      availableColors: [
-        { name: "Trắng", value: "white", color: "#FFFFFF" },
-        { name: "Xanh navy", value: "navy", color: "#1E3A8A" }
-      ],
-      category: "men-shirts",
-      material: "Cotton",
-      isNew: true,
-      isBestseller: false,
-      isWishlisted: false,
-      description: "Áo sơ mi nam chất liệu cotton cao cấp, thiết kế Oxford cổ điển, phù hợp cho công sở và dạo phố."
-    },
-    {
-      id: 2,
-      name: "Váy midi hoa nhí nữ",
-      brand: "H&M",
-      price: 650000,
-      originalPrice: null,
-      rating: 4.2,
-      reviewCount: 89,
-      images: [
-        "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400",
-        "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400"
-      ],
-      availableSizes: ["XS", "S", "M", "L"],
-      availableColors: [
-        { name: "Hồng", value: "pink", color: "#EC4899" },
-        { name: "Xanh", value: "blue", color: "#3B82F6" }
-      ],
-      category: "women-dresses",
-      material: "Polyester",
-      isNew: false,
-      isBestseller: true,
-      isWishlisted: true,
-      description: "Váy midi nữ tính với họa tiết hoa nhí dễ thương, chất liệu mềm mại, thoải mái."
-    },
-    {
-      id: 3,
-      name: "Quần jeans skinny nam",
-      brand: "Uniqlo",
-      price: 1200000,
-      originalPrice: 1500000,
-      rating: 4.7,
-      reviewCount: 256,
-      images: [
-        "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400",
-        "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400"
-      ],
-      availableSizes: ["28", "30", "32", "34", "36"],
-      availableColors: [
-        { name: "Xanh đậm", value: "dark-blue", color: "#1E3A8A" },
-        { name: "Đen", value: "black", color: "#000000" }
-      ],
-      category: "men-jeans",
-      material: "Denim",
-      isNew: false,
-      isBestseller: true,
-      isWishlisted: false,
-      description: "Quần jeans nam form skinny, chất liệu denim cao cấp, co giãn tốt, tôn dáng."
-    },
-    {
-      id: 4,
-      name: "Áo khoác bomber nữ",
-      brand: "Nike",
-      price: 2100000,
-      originalPrice: null,
-      rating: 4.3,
-      reviewCount: 67,
-      images: [
-        "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400",
-        "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400"
-      ],
-      availableSizes: ["S", "M", "L"],
-      availableColors: [
-        { name: "Đen", value: "black", color: "#000000" },
-        { name: "Xám", value: "gray", color: "#6B7280" }
-      ],
-      category: "women-jackets",
-      material: "Polyester",
-      isNew: true,
-      isBestseller: false,
-      isWishlisted: false,
-      description: "Áo khoác bomber phong cách thể thao, chất liệu nhẹ, phù hợp cho mùa thu đông."
-    },
-    {
-      id: 5,
-      name: "Giày sneaker trắng unisex",
-      brand: "Adidas",
-      price: 1800000,
-      originalPrice: 2200000,
-      rating: 4.6,
-      reviewCount: 342,
-      images: [
-        "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400",
-        "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400"
-      ],
-      availableSizes: ["36", "37", "38", "39", "40", "41", "42"],
-      availableColors: [
-        { name: "Trắng", value: "white", color: "#FFFFFF" },
-        { name: "Đen", value: "black", color: "#000000" }
-      ],
-      category: "shoes",
-      material: "Synthetic",
-      isNew: false,
-      isBestseller: true,
-      isWishlisted: true,
-      description: "Giày sneaker cổ điển, thiết kế tối giản, phù hợp cho mọi hoạt động hàng ngày."
-    },
-    {
-      id: 6,
-      name: "Túi xách da nữ",
-      brand: "Local Brand",
-      price: 950000,
-      originalPrice: null,
-      rating: 4.1,
-      reviewCount: 45,
-      images: [
-        "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400",
-        "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400"
-      ],
-      availableSizes: ["One Size"],
-      availableColors: [
-        { name: "Nâu", value: "brown", color: "#92400E" },
-        { name: "Đen", value: "black", color: "#000000" }
-      ],
-      category: "accessories",
-      material: "Leather",
-      isNew: true,
-      isBestseller: false,
-      isWishlisted: false,
-      description: "Túi xách da thật cao cấp, thiết kế sang trọng, phù hợp cho công sở và dạo phố."
-    }
-  ];
+  const mockProducts = baseProducts;
 
-  // Initialize products
+  // Initialize products: try backend first, fallback to mock
   useEffect(() => {
-    const initializeProducts = () => {
+    let mounted = true;
+    const initializeProducts = async () => {
       setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
+      try {
+  const res = await API.get('/api/products?status=active&limit=200');
+        const items = res?.data?.products || res?.data || [];
+        // Map server product shape to frontend-friendly product object
+        const mapped = (items || []).map((p, idx) => ({
+          id: p._id || p.id || String(idx),
+          name: p.name,
+          description: p.description || p.short_description || '',
+          images: (p.images && p.images.length) ? p.images.map(i => i.image_url || i.url || i) : [],
+          price: p.price || p.salePrice || p.original_price || 0,
+          originalPrice: p.original_price || p.originalPrice || null,
+          brand: p.brand || p.vendor || null,
+          category: p.category_id || (p.categories && p.categories[0]) || 'uncategorized',
+          stock: p.stock_quantity || p.stock || 0,
+          rating: p.rating || p.review_count || 0,
+          tags: p.tags || []
+        }));
+        if (!mounted) return;
+        setProducts(mapped);
+        setLoading(false);
+      } catch (err) {
+        // fallback to local mock (preserve previous behavior)
         const expandedProducts = [];
         for (let i = 0; i < 5; i++) {
-          expandedProducts?.push(...mockProducts?.map(product => ({
+          expandedProducts.push(...mockProducts.map(product => ({
             ...product,
-            id: product?.id + (i * mockProducts?.length)
+            id: product.id + (i * mockProducts.length)
           })));
         }
+        if (!mounted) return;
         setProducts(expandedProducts);
         setLoading(false);
-      }, 1000);
+      }
     };
 
     initializeProducts();
+    return () => { mounted = false; };
   }, []);
 
   // Filter and sort products
@@ -346,9 +227,28 @@ const ProductCatalog = () => {
   };
 
   // Handle add to cart
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
-    // Implement cart logic here
+  const handleAddToCart = async (product) => {
+    try {
+      await cart.addItem({
+        productId: product.id,
+        name: product.name,
+        price: product.price || product.salePrice,
+        quantity: product.quantity || 1,
+        image: product.images && product.images[0]
+      });
+      toast.push({
+        title: 'Thành công!',
+        message: `Đã thêm "${product.name}" vào giỏ hàng`,
+        type: 'success'
+      });
+    } catch (e) {
+      console.error('Failed to add to cart', e);
+      toast.push({
+        title: 'Lỗi!',
+        message: 'Không thể thêm sản phẩm vào giỏ hàng',
+        type: 'error'
+      });
+    }
   };
 
   // Handle load more

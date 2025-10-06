@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useSelector, useDispatch } from 'react-redux'
-import { removeItem, updateQuantity, clearCart, saveForLater, moveToCart, removeSavedItem } from '../../store/slices/cartSlice'
+import cart from '../../lib/cart'
+import API, { API_ENABLED } from '../../lib/api';
+import baseProducts from '../../data/products';
 import Header from '../../components/ui/Header';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -11,18 +13,20 @@ import SavedForLater from './components/SavedForLater';
 import CheckoutModal from './components/CheckoutModal';
 import EmptyCart from './components/EmptyCart';
 import { useToast } from '../../components/ui/ToastProvider';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 const ShoppingCart = () => {
   const dispatch = useDispatch()
-  const cartItems = useSelector(state => state.cart.cartItems)
   const savedItems = useSelector(state => state.cart.savedItems)
+  const [cartItems, setCartItems] = useState([])
   const [couponCode, setCouponCode] = useState('')
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   // Calculate order summary
   const orderSummary = React.useMemo(() => {
-    const subtotal = (cartItems || [])?.reduce((sum, item) => sum + (item?.price * item?.quantity), 0) || 0;
+    const subtotal = (cartItems || [])?.reduce((sum, item) => sum + (Number(item?.price || 0) * Number(item?.quantity || item?.qty || 1)), 0) || 0;
     const shipping = subtotal >= 500000 ? 0 : 30000;
     const tax = Math.round(subtotal * 0.1);
     const discount = couponCode === 'WELCOME10' ? Math.round(subtotal * 0.1) : 0;
@@ -31,9 +35,144 @@ const ShoppingCart = () => {
     return { subtotal, shipping, tax, discount, total };
   }, [cartItems, couponCode]);
 
-  // Cart actions
-  const handleUpdateQuantity = (itemId, newQuantity) => dispatch(updateQuantity({ id: itemId, quantity: newQuantity }))
-  const handleRemoveItem = (itemId) => dispatch(removeItem(itemId))
+  // Cart actions using helper
+  const refreshCart = async () => {
+    try {
+      const c = await cart.fetchCart();
+      const items = c?.items || [];
+      const enriched = await enrichItems(items);
+      setCartItems(enriched);
+    } catch (e) {
+      setCartItems([]);
+    }
+  }
+
+  // enrich items by fetching product details from server when possible
+  const enrichItems = async (items) => {
+    if (!items || items.length === 0) return [];
+    const promises = items.map(async (it) => {
+      try {
+        const pid = it.productId || it.id || it._id;
+        if (!pid) return it;
+        // If API is disabled (dev without backend), skip network calls and use local fallback
+        if (!API_ENABLED) {
+          const fallback = baseProducts.find(bp => String(bp.id) === String(pid));
+          if (!fallback) return it;
+          return {
+            id: fallback.id,
+            productId: fallback.id,
+            name: fallback.name || it.name,
+            image: (fallback.images && fallback.images[0]) || it.image || (it.snapshot && it.snapshot.image) || null,
+            price: it.price || it.salePrice || fallback.price || 0,
+            originalPrice: fallback.originalPrice || it.originalPrice,
+            quantity: it.quantity || it.qty || 1,
+            selectedSize: it.selectedSize || it.size || (it.snapshot && it.snapshot.size) || null,
+            selectedColor: it.selectedColor || it.color || (it.snapshot && it.snapshot.color) || null,
+            inStock: typeof fallback.stock !== 'undefined' ? (fallback.stock > 0) : (it.inStock ?? true),
+            brand: fallback.brand || it.brand,
+            snapshot: it.snapshot || null,
+            ...it
+          };
+        }
+
+        const res = await API.get(`/api/products/${pid}`);
+        const p = res?.data?.product || res?.data || null;
+        if (!p) {
+          // fallback to local mock
+          const fallback = baseProducts.find(bp => String(bp.id) === String(pid));
+          if (!fallback) return it;
+          return {
+            id: fallback.id,
+            productId: fallback.id,
+            name: fallback.name || it.name,
+            image: (fallback.images && fallback.images[0]) || it.image || (it.snapshot && it.snapshot.image) || null,
+            price: it.price || it.salePrice || fallback.price || 0,
+            originalPrice: fallback.originalPrice || it.originalPrice,
+            quantity: it.quantity || it.qty || 1,
+            selectedSize: it.selectedSize || it.size || (it.snapshot && it.snapshot.size) || null,
+            selectedColor: it.selectedColor || it.color || (it.snapshot && it.snapshot.color) || null,
+            inStock: typeof fallback.stock !== 'undefined' ? (fallback.stock > 0) : (it.inStock ?? true),
+            brand: fallback.brand || it.brand,
+            snapshot: it.snapshot || null,
+            ...it
+          };
+        }
+        return {
+          // merge: product authoritative fields, keep user's snapshot selections
+          id: p._id || p.id || pid,
+          productId: p._id || p.id || pid,
+          name: p.name || it.name,
+          image: (p.images && p.images[0]) || it.image || (it.snapshot && it.snapshot.image) || null,
+          price: it.price || it.salePrice || p.salePrice || p.price || p.originalPrice || 0,
+          originalPrice: p.originalPrice || it.originalPrice,
+          quantity: it.quantity || it.qty || 1,
+          selectedSize: it.selectedSize || it.size || (it.snapshot && it.snapshot.size) || null,
+          selectedColor: it.selectedColor || it.color || (it.snapshot && it.snapshot.color) || null,
+          inStock: typeof p.stock !== 'undefined' ? (p.stock > 0) : (it.inStock ?? true),
+          brand: p.brand || it.brand,
+          snapshot: it.snapshot || null,
+          // preserve any other properties
+          ...it
+        };
+      } catch (e) {
+        // fallback to baseProducts
+        const pid = it.productId || it.id || it._id;
+        const fallback = baseProducts.find(bp => String(bp.id) === String(pid));
+        if (!fallback) return it;
+        return {
+          id: fallback.id,
+          productId: fallback.id,
+          name: fallback.name || it.name,
+          image: (fallback.images && fallback.images[0]) || it.image || (it.snapshot && it.snapshot.image) || null,
+          price: it.price || it.salePrice || fallback.price || 0,
+          originalPrice: fallback.originalPrice || it.originalPrice,
+          quantity: it.quantity || it.qty || 1,
+          selectedSize: it.selectedSize || it.size || (it.snapshot && it.snapshot.size) || null,
+          selectedColor: it.selectedColor || it.color || (it.snapshot && it.snapshot.color) || null,
+          inStock: typeof fallback.stock !== 'undefined' ? (fallback.stock > 0) : (it.inStock ?? true),
+          brand: fallback.brand || it.brand,
+          snapshot: it.snapshot || null,
+          ...it
+        };
+      }
+    });
+    return Promise.all(promises);
+  };
+
+  useEffect(() => {
+    refreshCart();
+    const onCartUpdated = (e) => {
+      if (e?.detail) {
+        // enrich then set
+        (async () => {
+          const enriched = await enrichItems(e.detail.items || []);
+          setCartItems(enriched);
+        })();
+      } else refreshCart();
+    };
+    window.addEventListener('cart:updated', onCartUpdated);
+    window.addEventListener('storage', onCartUpdated);
+    return () => {
+      window.removeEventListener('cart:updated', onCartUpdated);
+      window.removeEventListener('storage', onCartUpdated);
+    };
+  }, []);
+
+  const handleUpdateQuantity = async (itemId, newQuantity) => {
+    const it = cartItems.find(i => (i.id || i.productId || i._id) === itemId);
+    if (!it) return;
+    const updated = { ...it, quantity: newQuantity };
+    await cart.updateItem(updated);
+    await refreshCart();
+  };
+
+  const handleRemoveItem = async (itemId) => {
+    const it = cartItems.find(i => (i.id || i.productId || i._id) === itemId);
+    if (!it) return;
+    await cart.removeItem(it);
+    await refreshCart();
+  };
+
   const handleSaveForLater = (itemId) => dispatch(saveForLater(itemId))
   const handleMoveToWishlist = (itemId) => {
     // wishlist logic placeholder
@@ -67,16 +206,19 @@ const ShoppingCart = () => {
     setIsLoading(true)
     await new Promise(resolve => setTimeout(resolve, 2000))
     console.log('Order placed:', orderData)
-    dispatch(clearCart())
+    await cart.clearCart()
     setIsLoading(false)
   toast.push({ title: 'Đặt hàng thành công', message: 'Cảm ơn bạn đã mua sắm tại ABC Fashion Store.', type: 'success' })
   }
 
   const handleClearCart = () => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa tất cả sản phẩm khỏi giỏ hàng?')) {
-      dispatch(clearCart())
-  toast.push({ title: 'Đã xóa', message: 'Giỏ hàng đã được làm mới.', type: 'info' })
-    }
+    setShowClearConfirm(true);
+  }
+
+  const confirmClearCart = async () => {
+    await cart.clearCart();
+    refreshCart();
+    toast.push({ title: 'Đã xóa', message: 'Giỏ hàng đã được làm mới.', type: 'info' });
   }
 
   const toast = useToast();
@@ -225,6 +367,18 @@ const ShoppingCart = () => {
           cartItems={cartItems}
           orderSummary={orderSummary}
           onPlaceOrder={handlePlaceOrder}
+        />
+
+        {/* Confirm Clear Cart Modal */}
+        <ConfirmModal
+          isOpen={showClearConfirm}
+          onClose={() => setShowClearConfirm(false)}
+          onConfirm={confirmClearCart}
+          title="Xóa tất cả sản phẩm?"
+          message="Bạn có chắc chắn muốn xóa tất cả sản phẩm khỏi giỏ hàng? Hành động này không thể hoàn tác."
+          confirmText="Xóa tất cả"
+          cancelText="Hủy bỏ"
+          type="danger"
         />
       </div>
     </>

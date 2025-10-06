@@ -3,12 +3,40 @@ import { Link } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
+import { useToast } from '../../../components/ui/ToastProvider';
+import cart from '../../../lib/cart';
 
 const ProductCarousel = ({ title, subtitle, products, sectionId }) => {
+  const toast = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const carouselRef = useRef(null);
   const itemsPerView = 4;
+
+  const handleAddToCart = async (product, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await cart.addItem({
+        productId: product.id,
+        name: product.name,
+        price: product.salePrice || product.price,
+        quantity: 1,
+        image: product.image
+      });
+      toast.push({
+        title: 'Thành công!',
+        message: `Đã thêm "${product.name}" vào giỏ hàng`,
+        type: 'success'
+      });
+    } catch (e) {
+      toast.push({
+        title: 'Lỗi!',
+        message: 'Không thể thêm sản phẩm vào giỏ hàng',
+        type: 'error'
+      });
+    }
+  };
 
   useEffect(() => {
     if (!isAutoPlaying) return;
@@ -127,7 +155,11 @@ const ProductCarousel = ({ title, subtitle, products, sectionId }) => {
 
                     {/* Quick Add to Cart */}
                     <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                      <Button size="sm" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+                        onClick={(e) => handleAddToCart(product, e)}
+                      >
                         <Icon name="ShoppingCart" size={16} className="mr-2" />
                         Thêm vào giỏ
                       </Button>

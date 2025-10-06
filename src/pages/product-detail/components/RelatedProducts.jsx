@@ -3,13 +3,42 @@ import { Link } from 'react-router-dom';
 import Image from '../../../components/AppImage';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
+import { useToast } from '../../../components/ui/ToastProvider';
+import cart from '../../../lib/cart';
 
 const RelatedProducts = ({ products, title = "Sản phẩm liên quan" }) => {
+  const toast = useToast();
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
     })?.format(price);
+  };
+
+  const handleAddToCart = async (product, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await cart.addItem({
+        productId: product.id,
+        name: product.name,
+        price: product.salePrice || product.price,
+        quantity: 1,
+        image: product.image
+      });
+      toast.push({
+        title: 'Thành công!',
+        message: `Đã thêm "${product.name}" vào giỏ hàng`,
+        type: 'success'
+      });
+    } catch (e) {
+      toast.push({
+        title: 'Lỗi!',
+        message: 'Không thể thêm sản phẩm vào giỏ hàng',
+        type: 'error'
+      });
+    }
   };
 
   return (
@@ -111,6 +140,7 @@ const RelatedProducts = ({ products, title = "Sản phẩm liên quan" }) => {
                 iconName="ShoppingCart"
                 iconPosition="left"
                 disabled={product?.stock === 0}
+                onClick={(e) => handleAddToCart(product, e)}
               >
                 {product?.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
               </Button>

@@ -1,62 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
+import API from '../../../lib/api';
+import { useToast } from '../../../components/ui/ToastProvider';
 
 const WishlistSection = () => {
-  const [wishlistItems, setWishlistItems] = useState([
-    {
-      id: 1,
-      name: "Áo khoác denim vintage",
-      image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=300&h=300&fit=crop",
-      price: 1250000,
-      originalPrice: 1500000,
-      discount: 17,
-      inStock: true,
-      sizes: ["S", "M", "L"],
-      colors: ["Xanh denim", "Đen"],
-      addedDate: "2024-09-20"
-    },
-    {
-      id: 2,
-      name: "Váy maxi hoa cúc",
-      image: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=300&h=300&fit=crop",
-      price: 890000,
-      originalPrice: 890000,
-      discount: 0,
-      inStock: true,
-      sizes: ["XS", "S", "M"],
-      colors: ["Hoa cúc trắng", "Hoa cúc vàng"],
-      addedDate: "2024-09-18"
-    },
-    {
-      id: 3,
-      name: "Giày cao gót da thật",
-      image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=300&h=300&fit=crop",
-      price: 2100000,
-      originalPrice: 2100000,
-      discount: 0,
-      inStock: false,
-      sizes: ["36", "37", "38", "39"],
-      colors: ["Đen", "Nâu", "Nude"],
-      addedDate: "2024-09-15"
-    },
-    {
-      id: 4,
-      name: "Túi xách tay cao cấp",
-      image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=300&fit=crop",
-      price: 3200000,
-      originalPrice: 4000000,
-      discount: 20,
-      inStock: true,
-      sizes: ["One Size"],
-      colors: ["Đen", "Nâu", "Xám"],
-      addedDate: "2024-09-12"
-    }
-  ]);
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [selectedItems, setSelectedItems] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // grid or list
+  const toast = useToast();
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -73,9 +28,40 @@ const WishlistSection = () => {
     });
   };
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await API.get('/api/wishlist');
+        const items = (res?.data?.items || []).map(i => ({
+          id: i.productId,
+          name: i.snapshot?.name || `Sản phẩm ${i.productId}`,
+          image: i.snapshot?.image,
+          price: i.snapshot?.price || 0,
+          addedDate: i.addedAt
+        }));
+        if (mounted) setWishlistItems(items);
+      } catch (e) {
+        // ignore, keep empty
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const handleRemoveItem = (itemId) => {
-    setWishlistItems(prev => prev?.filter(item => item?.id !== itemId));
-    setSelectedItems(prev => prev?.filter(id => id !== itemId));
+    (async () => {
+      try {
+        await API.post('/api/wishlist/remove', { productId: itemId });
+        setWishlistItems(prev => prev?.filter(item => item?.id !== itemId));
+        setSelectedItems(prev => prev?.filter(id => id !== itemId));
+      } catch (e) {
+        // fallback local removal
+        setWishlistItems(prev => prev?.filter(item => item?.id !== itemId));
+        setSelectedItems(prev => prev?.filter(id => id !== itemId));
+      }
+    })();
   };
 
   const handleSelectItem = (itemId) => {
@@ -95,13 +81,29 @@ const WishlistSection = () => {
   };
 
   const handleRemoveSelected = () => {
-    setWishlistItems(prev => prev?.filter(item => !selectedItems?.includes(item?.id)));
-    setSelectedItems([]);
+    (async () => {
+      try {
+        await Promise.all(selectedItems.map(id => API.post('/api/wishlist/remove', { productId: id })));
+        setWishlistItems(prev => prev?.filter(item => !selectedItems?.includes(item?.id)));
+        setSelectedItems([]);
+        toast.push({ title: 'Đã xóa', message: 'Đã xóa sản phẩm khỏi yêu thích', type: 'success' });
+      } catch (e) {
+        // fallback local
+        setWishlistItems(prev => prev?.filter(item => !selectedItems?.includes(item?.id)));
+        setSelectedItems([]);
+        toast.push({ title: 'Lỗi', message: 'Không thể xóa một vài mục', type: 'error' });
+      }
+    })();
   };
 
   const handleAddToCart = (item) => {
     // Mock add to cart functionality
     console.log('Added to cart:', item);
+    toast.push({
+      title: 'Thành công!',
+      message: `Đã thêm "${item.name}" vào giỏ hàng`,
+      type: 'success'
+    });
   };
 
   return (

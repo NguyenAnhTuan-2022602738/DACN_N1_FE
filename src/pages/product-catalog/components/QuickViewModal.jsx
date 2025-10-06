@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
+import { useToast } from '../../../components/ui/ToastProvider';
 
 const QuickViewModal = ({ product, isOpen, onClose, onAddToCart, onWishlistToggle }) => {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState(product?.availableColors?.[0] || null);
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const toast = useToast();
 
   if (!isOpen || !product) return null;
 
@@ -27,7 +29,11 @@ const QuickViewModal = ({ product, isOpen, onClose, onAddToCart, onWishlistToggl
 
   const handleAddToCart = () => {
     if (!selectedSize && product?.availableSizes?.length > 0) {
-      alert('Vui lòng chọn kích thước');
+      toast.push({
+        title: 'Thiếu thông tin',
+        message: 'Vui lòng chọn kích thước',
+        type: 'warning'
+      });
       return;
     }
 
@@ -36,6 +42,12 @@ const QuickViewModal = ({ product, isOpen, onClose, onAddToCart, onWishlistToggl
       selectedSize,
       selectedColor,
       quantity
+    });
+
+    toast.push({
+      title: 'Thành công!',
+      message: `Đã thêm ${quantity} sản phẩm vào giỏ hàng`,
+      type: 'success'
     });
 
     onClose();

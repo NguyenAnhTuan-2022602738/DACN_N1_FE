@@ -9,6 +9,9 @@ import ActivityFeed from './components/ActivityFeed';
 import SalesChart from './components/SalesChart';
 import TopProduct from './components/TopProduct';
 import UserManagement from './components/UserManagement';
+import ProductsList from '../admin/ProductsList';
+import ProductForm from '../admin/ProductForm';
+import { useNavigate } from 'react-router-dom';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -17,6 +20,7 @@ const AdminPanel = () => {
     role: "admin",
     avatar: "https://randomuser.me/api/portraits/men/1.jpg"
   });
+  const navigate = useNavigate();
 
   const tabs = [
     { id: 'dashboard', label: 'Tổng quan', icon: 'BarChart3' },
@@ -106,7 +110,7 @@ const AdminPanel = () => {
       case 'products':
         return (
           <div className="space-y-6">
-            <TopProduct />
+            <ProductsList />
           </div>
         );
 
@@ -156,7 +160,7 @@ const AdminPanel = () => {
                 <Button variant="outline" iconName="Download" iconPosition="left">
                   Xuất báo cáo
                 </Button>
-                <Button variant="default" iconName="Plus" iconPosition="left">
+                <Button variant="default" iconName="Plus" iconPosition="left" onClick={() => navigate('/admin/products/new')}>
                   Thêm mới
                 </Button>
               </div>

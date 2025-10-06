@@ -3,13 +3,28 @@ import { Link } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
+import { useToast } from '../../../components/ui/ToastProvider';
 
 const SavedForLater = ({ items, onMoveToCart, onRemove, onMoveToWishlist }) => {
+  const toast = useToast();
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
     })?.format(price);
+  };
+
+  const handleMoveToCart = (itemId) => {
+    const item = items.find(i => i.id === itemId);
+    onMoveToCart(itemId);
+    if (item) {
+      toast.push({
+        title: 'Thành công!',
+        message: `Đã thêm "${item.name}" vào giỏ hàng`,
+        type: 'success'
+      });
+    }
   };
 
   if (!items || items?.length === 0) {
@@ -79,7 +94,7 @@ const SavedForLater = ({ items, onMoveToCart, onRemove, onMoveToWishlist }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onMoveToCart(item?.id)}
+                  onClick={() => handleMoveToCart(item?.id)}
                   disabled={!item?.inStock}
                   className="flex-1 text-xs"
                 >

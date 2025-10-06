@@ -2,32 +2,38 @@ import React, { useState } from 'react';
 import Header from '../../components/ui/Header';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ProfileSection from './components/ProfileSection';
 import OrderHistory from './components/OrderHistory';
 import WishlistSection from './components/WishlistSection';
 import AddressBook from './components/AddressBook';
 import AccountSettings from './components/AccountSettings';
 import LoyaltyProgram from './components/LoyaltyProgram';
+import Checkout from '../checkout';
+import API from '../../lib/api';
 
 const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const menuItems = [
     { id: 'profile', label: 'Thông tin cá nhân', icon: 'User' },
     { id: 'orders', label: 'Đơn hàng của tôi', icon: 'Package' },
     { id: 'wishlist', label: 'Danh sách yêu thích', icon: 'Heart' },
     { id: 'addresses', label: 'Sổ địa chỉ', icon: 'MapPin' },
+    { id: 'checkout', label: 'Thanh toán', icon: 'CreditCard' },
     { id: 'loyalty', label: 'Điểm thưởng', icon: 'Star' },
     { id: 'settings', label: 'Cài đặt tài khoản', icon: 'Settings' }
   ];
 
-  const userStats = {
-    totalOrders: 12,
-    pendingOrders: 2,
-    wishlistItems: 8,
-    loyaltyPoints: 2450
-  };
+  const [userStats, setUserStats] = React.useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    wishlistItems: 0,
+    loyaltyPoints: 0
+  });
 
   const [currentUser, setCurrentUser] = React.useState(() => {
     try {
@@ -36,6 +42,19 @@ const UserDashboard = () => {
   });
 
   React.useEffect(() => {
+    // if path is /user-dashboard/<tab> use that tab
+    try {
+      const parts = location.pathname.split('/').filter(Boolean);
+      // parts might be ['user-dashboard', 'wishlist']
+      if (parts.length >= 2 && parts[0] === 'user-dashboard') {
+        setActiveTab(parts[1]);
+      } else {
+        // fallback to query ?tab=
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab) setActiveTab(tab);
+      }
+    } catch (e) {}
     // if we don't have a user in storage, try to fetch /me
     if (!currentUser) {
       (async () => {
@@ -46,7 +65,35 @@ const UserDashboard = () => {
         } catch (e) {}
       })();
     }
-  }, []);
+    // fetch orders/wishlist stats if possible
+    (async () => {
+      try {
+        // try fetching orders list for this user; backend may support filtering
+        const ordersRes = await API.get('/api/orders');
+        const orders = ordersRes?.data?.orders || ordersRes?.data || [];
+        const total = Array.isArray(orders) ? orders.length : 0;
+        const pending = Array.isArray(orders) ? orders.filter(o => o.status === 'pending' || o.status === 'processing').length : 0;
+        let wishlistCount = 0;
+        try {
+          const wl = await API.get('/api/wishlist');
+          const items = wl?.data?.items || wl?.data || [];
+          wishlistCount = Array.isArray(items) ? items.length : 0;
+        } catch (e) {
+          // ignore wishlist fetch error
+        }
+        // try to fetch loyalty points if available
+        let points = 0;
+        try {
+          const p = await API.get('/api/loyalty');
+          points = p?.data?.points || p?.data || 0;
+        } catch (e) {}
+        setUserStats({ totalOrders: total, pendingOrders: pending, wishlistItems: wishlistCount, loyaltyPoints: points });
+      } catch (e) {
+        // fallback to sensible defaults
+        setUserStats({ totalOrders: 0, pendingOrders: 0, wishlistItems: 0, loyaltyPoints: 0 });
+      }
+    })();
+  }, [location]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -56,6 +103,8 @@ const UserDashboard = () => {
         return <OrderHistory />;
       case 'wishlist':
         return <WishlistSection />;
+      case 'checkout':
+        return <Checkout embedded={true} />;
       case 'addresses':
         return <AddressBook />;
       case 'loyalty':
@@ -82,7 +131,7 @@ const UserDashboard = () => {
               <div className="mb-4 lg:mb-0">
                 <h1 className="text-2xl lg:text-3xl font-bold mb-2">Chào mừng trở lại!</h1>
                 <p className="text-lg opacity-90">{currentUser?.name || currentUser?.email || 'Bạn'}</p>
-                <p className="text-sm opacity-75">{currentUser?.createdAt ? `Thành viên từ ${new Date(currentUser.createdAt).toLocaleString('vi-VN', { month: 'long', year: 'numeric' })}` : ''}</p>
+                <p className="text-sm opacity-75">{currentUser?.createdAt ? `Thành viên từ tháng ${new Date(currentUser.createdAt).getMonth() + 1} năm ${new Date(currentUser.createdAt).getFullYear()}` : ''}</p>
               </div>
               
               {/* Quick Stats */}
@@ -139,8 +188,9 @@ const UserDashboard = () => {
                       key={item?.id}
                       variant={activeTab === item?.id ? 'default' : 'ghost'}
                       onClick={() => {
-                        setActiveTab(item?.id);
-                        setIsSidebarOpen(false);
+                          // navigate to /user-dashboard/<tab>
+                          navigate(`/user-dashboard/${item?.id}`);
+                          setIsSidebarOpen(false);
                       }}
                       className="w-full justify-start mb-1"
                     >
