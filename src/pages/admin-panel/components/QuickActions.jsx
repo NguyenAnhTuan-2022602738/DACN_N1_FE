@@ -1,7 +1,10 @@
 import React from 'react';
 import Button from '../../../components/ui/Button';
+import { useNavigate } from 'react-router-dom';
 
 const QuickActions = () => {
+  const navigate = useNavigate();
+  
   const actions = [
     {
       id: 1,
@@ -9,23 +12,23 @@ const QuickActions = () => {
       description: "Tạo sản phẩm mới trong catalog",
       icon: "Plus",
       variant: "default",
-      onClick: () => console.log("Add product")
+      onClick: () => navigate('/admin-panel/products/new')
     },
     {
       id: 2,
+      title: "Quản lý danh mục",
+      description: "Xem và chỉnh sửa danh mục",
+      icon: "Folder",
+      variant: "outline",
+      onClick: () => navigate('/admin-panel?tab=categories')
+    },
+    {
+      id: 3,
       title: "Xử lý đơn hàng",
       description: "Xem và xử lý đơn hàng chờ",
       icon: "Package",
       variant: "outline",
       onClick: () => console.log("Process orders")
-    },
-    {
-      id: 3,
-      title: "Quản lý khuyến mãi",
-      description: "Tạo và quản lý chiến dịch",
-      icon: "Tag",
-      variant: "outline",
-      onClick: () => console.log("Manage promotions")
     },
     {
       id: 4,

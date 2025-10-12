@@ -19,12 +19,19 @@ const ProductCarousel = ({ title, subtitle, products, sectionId }) => {
     e.preventDefault();
     e.stopPropagation();
     try {
+      const defaultSize = product?.availableSizes?.[0]
+        || product?.sizes?.[0]
+        || null;
+      const firstColorObj = Array.isArray(product?.availableColors) ? product?.availableColors?.[0] : null;
+      const defaultColor = firstColorObj?.name || firstColorObj?.value || (Array.isArray(product?.colors) ? product?.colors?.[0] : null) || null;
       await cart.addItem({
         productId: product.id,
         name: product.name,
         price: product.salePrice || product.price,
         quantity: 1,
-        image: product.image
+        image: product.image,
+        selectedSize: defaultSize,
+        selectedColor: defaultColor
       });
       toast.push({
         title: 'Thành công!',

@@ -398,12 +398,18 @@ const ProductDetail = () => {
       {/* Floating Action Button for Mobile */}
       <div className="fixed bottom-4 right-4 lg:hidden">
         <button
-          onClick={() => handleAddToCart({
-            ...(product || mockProduct),
-            selectedSize: 'M',
-            selectedColor: (product || mockProduct)?.colors?.[0],
-            quantity: 1
-          })}
+          onClick={() => {
+            const p = (product || mockProduct);
+            const firstSize = Array.isArray(p?.sizes) && p.sizes.length > 0 ? p.sizes[0] : null;
+            const firstColorEntry = Array.isArray(p?.colors) && p.colors.length > 0 ? p.colors[0] : null;
+            const firstColor = typeof firstColorEntry === 'string' ? firstColorEntry : (firstColorEntry?.name || firstColorEntry?.value || null);
+            handleAddToCart({
+              ...p,
+              selectedSize: firstSize,
+              selectedColor: firstColor,
+              quantity: 1
+            });
+          }}
           className="w-14 h-14 bg-accent text-accent-foreground rounded-full shadow-elegant flex items-center justify-center transition-smooth hover:scale-105"
         >
           <Icon name="ShoppingCart" size={24} />

@@ -1,0 +1,22 @@
+// Simple MongoDB commands to fix index issue
+// Copy these commands and run in MongoDB Compass Shell or MongoDB Shell
+
+// 1. Connect to your database
+use ABC_SHOP
+
+// 2. Check current indexes
+db.cartitems.getIndexes()
+
+// 3. Drop the conflicting index (the one causing duplicate key error)
+db.cartitems.dropIndex("user_id_1_product_id_1_variant_id_1")
+
+// 4. Clear all cart items for fresh start
+db.cartitems.deleteMany({})
+
+// 5. Verify - should show empty collection
+db.cartitems.count()
+
+// 6. Check remaining indexes
+db.cartitems.getIndexes()
+
+// Done! Now restart your backend server and try adding products again

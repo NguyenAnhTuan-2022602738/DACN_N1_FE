@@ -28,6 +28,7 @@ const ProductCatalog = () => {
   const [activeCategory, setActiveCategory] = useState(searchParams?.get('category') || 'all');
   const [sortBy, setSortBy] = useState('relevance');
   const [viewMode, setViewMode] = useState('grid');
+  const [itemsPerPage, setItemsPerPage] = useState(12); // default for grid
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [filters, setFilters] = useState({
@@ -50,19 +51,32 @@ const ProductCatalog = () => {
   const res = await API.get('/api/products?status=active&limit=200');
         const items = res?.data?.products || res?.data || [];
         // Map server product shape to frontend-friendly product object
-        const mapped = (items || []).map((p, idx) => ({
-          id: p._id || p.id || String(idx),
-          name: p.name,
-          description: p.description || p.short_description || '',
-          images: (p.images && p.images.length) ? p.images.map(i => i.image_url || i.url || i) : [],
-          price: p.price || p.salePrice || p.original_price || 0,
-          originalPrice: p.original_price || p.originalPrice || null,
-          brand: p.brand || p.vendor || null,
-          category: p.category_id || (p.categories && p.categories[0]) || 'uncategorized',
-          stock: p.stock_quantity || p.stock || 0,
-          rating: p.rating || p.review_count || 0,
-          tags: p.tags || []
-        }));
+        const mapped = (items || []).map((p, idx) => {
+          // derive sizes/colors from variants when available
+          const sizes = [];
+          const colors = [];
+          if (Array.isArray(p?.variants)) {
+            p.variants.forEach(v => {
+              if ((v.name || v.type) === 'Size' && v.value) sizes.push(v.value);
+              if ((v.name || v.type) === 'Color' && v.value) colors.push({ name: v.value, value: v.value, color: v.color || undefined });
+            });
+          }
+          return {
+            id: p._id || p.id || String(idx),
+            name: p.name,
+            description: p.description || p.short_description || '',
+            images: (p.images && p.images.length) ? p.images.map(i => i.image_url || i.url || i) : [],
+            price: p.price || p.salePrice || p.original_price || 0,
+            originalPrice: p.original_price || p.originalPrice || null,
+            brand: p.brand || p.vendor || null,
+            category: p.category_id || (p.categories && p.categories[0]) || 'uncategorized',
+            stock: p.stock_quantity || p.stock || 0,
+            rating: p.rating || p.review_count || 0,
+            tags: p.tags || [],
+            availableSizes: sizes,
+            availableColors: colors
+          };
+        });
         if (!mounted) return;
         setProducts(mapped);
         setLoading(false);
@@ -159,7 +173,22 @@ const ProductCatalog = () => {
     });
 
     setFilteredProducts(filtered);
+    setCurrentPage(1); // reset to first page when filter/sort changes
   }, [products, searchQuery, activeCategory, filters, sortBy]);
+
+  // Reset itemsPerPage when viewMode changes
+  useEffect(() => {
+    if (viewMode === 'grid' && ![8,12,16,20].includes(itemsPerPage)) setItemsPerPage(12);
+    if (viewMode === 'list' && ![6,9,12,15,18].includes(itemsPerPage)) setItemsPerPage(9);
+    setCurrentPage(1);
+  }, [viewMode]);
+
+  const pageOptionsGrid = [8, 12, 16, 20];
+  const pageOptionsList = [6, 9, 12, 15, 18];
+  const pageOptions = viewMode === 'grid' ? pageOptionsGrid : pageOptionsList;
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const displayedProducts = filteredProducts.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage);
+  const hasMoreProducts = currentPage < totalPages;
 
   // Handle search
   const handleSearch = (query) => {
@@ -266,12 +295,27 @@ const ProductCatalog = () => {
   // Handle add to cart
   const handleAddToCart = async (product) => {
     try {
+      // Prefer selected variants passed in (e.g., from Quick View). Otherwise auto-pick first.
+      const defaultSize = product?.selectedSize ?? (product?.availableSizes?.[0]
+        || product?.sizes?.[0]
+        || null);
+      // Colors can be objects or strings; normalize to string name/value
+      const selectedColorInput = product?.selectedColor;
+      const firstColorObj = Array.isArray(product?.availableColors) ? product?.availableColors?.[0] : null;
+      const autoColor = firstColorObj?.name || firstColorObj?.value || (Array.isArray(product?.colors) ? product?.colors?.[0] : null) || null;
+      const defaultColor = typeof selectedColorInput === 'string'
+        ? selectedColorInput
+        : (selectedColorInput?.name || selectedColorInput?.value || autoColor);
+      const qty = product?.quantity || 1;
+
       await cart.addItem({
         productId: product.id,
         name: product.name,
         price: product.price || product.salePrice,
-        quantity: product.quantity || 1,
-        image: product.images && product.images[0]
+        quantity: qty,
+        image: product.images && product.images[0],
+        selectedSize: defaultSize,
+        selectedColor: defaultColor
       });
       toast.push({
         title: 'Thành công!',
@@ -287,20 +331,6 @@ const ProductCatalog = () => {
       });
     }
   };
-
-  // Handle load more
-  const handleLoadMore = () => {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        setCurrentPage(prev => prev + 1);
-        // In real app, load more products from API
-        resolve();
-      }, 1000);
-    });
-  };
-
-  const displayedProducts = filteredProducts?.slice(0, currentPage * 12);
-  const hasMoreProducts = filteredProducts?.length > displayedProducts?.length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -373,7 +403,7 @@ const ProductCatalog = () => {
                     <Button
                       variant={viewMode === 'grid' ? 'default' : 'ghost'}
                       size="sm"
-                      onClick={() => setViewMode('grid')}
+                      onClick={() => { setViewMode('grid'); setItemsPerPage(12); setCurrentPage(1); }}
                       className="w-8 h-8"
                     >
                       <Icon name="Grid3X3" size={16} />
@@ -381,7 +411,7 @@ const ProductCatalog = () => {
                     <Button
                       variant={viewMode === 'list' ? 'default' : 'ghost'}
                       size="sm"
-                      onClick={() => setViewMode('list')}
+                      onClick={() => { setViewMode('list'); setItemsPerPage(9); setCurrentPage(1); }}
                       className="w-8 h-8"
                     >
                       <Icon name="List" size={16} />
@@ -393,6 +423,17 @@ const ProductCatalog = () => {
                     currentSort={sortBy}
                     onSortChange={setSortBy}
                   />
+
+                  {/* Items per page dropdown */}
+                  <select
+                    className="border rounded px-2 py-1 text-sm bg-background text-foreground"
+                    value={itemsPerPage}
+                    onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                  >
+                    {pageOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt} / trang</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -400,25 +441,61 @@ const ProductCatalog = () => {
               <ProductGrid
                 products={displayedProducts}
                 loading={loading}
-                hasMore={hasMoreProducts}
-                onLoadMore={handleLoadMore}
                 onWishlistToggle={handleWishlistToggle}
                 onQuickView={handleQuickView}
                 onAddToCart={handleAddToCart}
                 viewMode={viewMode}
               />
+
+              {/* Pagination & End Message */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-8">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                  >
+                    <Icon name="ChevronLeft" size={16} />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      className={`px-3 py-1 rounded ${page === currentPage ? 'bg-accent text-white' : 'bg-muted text-foreground'}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                  >
+                    <Icon name="ChevronRight" size={16} />
+                  </Button>
+                </div>
+              )}
+              {currentPage === totalPages && displayedProducts.length > 0 && (
+                <div className="text-center text-muted-foreground mt-4 mb-8 text-sm">
+                  Đã xem hết danh sách sản phẩm
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
       {/* Mobile Filter Sidebar */}
-      <FilterSidebar
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onClearFilters={handleClearFilters}
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-      />
+        <div className="lg:hidden">
+          <FilterSidebar
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onClearFilters={handleClearFilters}
+            isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
+          />
+        </div>
       {/* Quick View Modal */}
       <QuickViewModal
         product={quickViewProduct}

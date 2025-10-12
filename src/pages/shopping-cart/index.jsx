@@ -54,10 +54,13 @@ const ShoppingCart = () => {
       try {
         const pid = it.productId || it.id || it._id;
         if (!pid) return it;
+        
         // If API is disabled (dev without backend), skip network calls and use local fallback
         if (!API_ENABLED) {
           const fallback = baseProducts.find(bp => String(bp.id) === String(pid));
           if (!fallback) return it;
+          const fallbackSizes = fallback.availableSizes || fallback.sizes || [];
+          const fallbackColors = (fallback.availableColors || fallback.colors || []).map(c => typeof c === 'string' ? c : (c?.name || c?.value)).filter(Boolean);
           return {
             id: fallback.id,
             productId: fallback.id,
@@ -71,6 +74,8 @@ const ShoppingCart = () => {
             inStock: typeof fallback.stock !== 'undefined' ? (fallback.stock > 0) : (it.inStock ?? true),
             brand: fallback.brand || it.brand,
             snapshot: it.snapshot || null,
+            availableSizes: fallbackSizes,
+            availableColors: fallbackColors,
             ...it
           };
         }
@@ -81,6 +86,8 @@ const ShoppingCart = () => {
           // fallback to local mock
           const fallback = baseProducts.find(bp => String(bp.id) === String(pid));
           if (!fallback) return it;
+          const fallbackSizes = fallback.availableSizes || fallback.sizes || [];
+          const fallbackColors = (fallback.availableColors || fallback.colors || []).map(c => typeof c === 'string' ? c : (c?.name || c?.value)).filter(Boolean);
           return {
             id: fallback.id,
             productId: fallback.id,
@@ -94,8 +101,19 @@ const ShoppingCart = () => {
             inStock: typeof fallback.stock !== 'undefined' ? (fallback.stock > 0) : (it.inStock ?? true),
             brand: fallback.brand || it.brand,
             snapshot: it.snapshot || null,
+            availableSizes: fallbackSizes,
+            availableColors: fallbackColors,
             ...it
           };
+        }
+        // Derive sizes/colors from API product variants when available
+        const apiSizes = [];
+        const apiColors = [];
+        if (Array.isArray(p?.variants)) {
+          p.variants.forEach(v => {
+            if ((v.name || v.type) === 'Size' && v.value) apiSizes.push(v.value);
+            if ((v.name || v.type) === 'Color' && v.value) apiColors.push(v.value);
+          });
         }
         return {
           // merge: product authoritative fields, keep user's snapshot selections
@@ -111,6 +129,9 @@ const ShoppingCart = () => {
           inStock: typeof p.stock !== 'undefined' ? (p.stock > 0) : (it.inStock ?? true),
           brand: p.brand || it.brand,
           snapshot: it.snapshot || null,
+          // Add available sizes and colors for dropdown (prefer variants)
+          availableSizes: apiSizes.length > 0 ? apiSizes : (p.sizes || []),
+          availableColors: apiColors.length > 0 ? apiColors : (Array.isArray(p.colors) ? p.colors : []),
           // preserve any other properties
           ...it
         };
@@ -119,6 +140,8 @@ const ShoppingCart = () => {
         const pid = it.productId || it.id || it._id;
         const fallback = baseProducts.find(bp => String(bp.id) === String(pid));
         if (!fallback) return it;
+        const fallbackSizes = fallback.availableSizes || fallback.sizes || [];
+        const fallbackColors = (fallback.availableColors || fallback.colors || []).map(c => typeof c === 'string' ? c : (c?.name || c?.value)).filter(Boolean);
         return {
           id: fallback.id,
           productId: fallback.id,
@@ -132,6 +155,8 @@ const ShoppingCart = () => {
           inStock: typeof fallback.stock !== 'undefined' ? (fallback.stock > 0) : (it.inStock ?? true),
           brand: fallback.brand || it.brand,
           snapshot: it.snapshot || null,
+          availableSizes: fallbackSizes,
+          availableColors: fallbackColors,
           ...it
         };
       }
@@ -163,6 +188,28 @@ const ShoppingCart = () => {
     if (!it) return;
     const updated = { ...it, quantity: newQuantity };
     await cart.updateItem(updated);
+    await refreshCart();
+  };
+
+  const handleUpdateSizeColor = async (itemId, newSize, newColor) => {
+    const it = cartItems.find(i => (i.id || i.productId || i._id) === itemId);
+    if (!it) return;
+    
+    // Remove old item
+    await cart.removeItem(it);
+    
+    // Add as new item with new size/color (will merge if exists)
+    await cart.addItem({
+      id: it.productId || it.id,
+      productId: it.productId || it.id,
+      name: it.name,
+      price: it.price,
+      image: it.image,
+      selectedSize: newSize,
+      selectedColor: newColor,
+      quantity: it.quantity
+    });
+    
     await refreshCart();
   };
 
@@ -274,6 +321,7 @@ const ShoppingCart = () => {
                       key={item?.id}
                       item={item}
                       onUpdateQuantity={handleUpdateQuantity}
+                      onUpdateSizeColor={handleUpdateSizeColor}
                       onRemove={handleRemoveItem}
                       onSaveForLater={handleSaveForLater}
                       onMoveToWishlist={handleMoveToWishlist}

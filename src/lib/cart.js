@@ -45,8 +45,20 @@ function _makeKey(item) {
   // canonical key for item equality: productId + size + color
   const pid = item.id || item.productId || item._id || '';
   const size = item.selectedSize || item.size || '';
-  const color = (item.selectedColor && (item.selectedColor.name || item.selectedColor)) || '';
-  return `${pid}::${size}::${color}`;
+  // Normalize color value - handle both string and object formats
+  let color = '';
+  if (item.selectedColor) {
+    if (typeof item.selectedColor === 'string') {
+      color = item.selectedColor;
+    } else if (item.selectedColor.name) {
+      color = item.selectedColor.name;
+    } else if (item.selectedColor.value) {
+      color = item.selectedColor.value;
+    }
+  }
+  const key = `${pid}::${size}::${color}`;
+  // console.log('[_makeKey]', { pid, size, color, key });
+  return key;
 }
 
 function _dispatch(cart) {
@@ -94,6 +106,25 @@ async function fetchCart() {
 
 async function addItem(item) {
   // normalize item shape
+  let normalizedColor = null;
+  if (item.selectedColor) {
+    if (typeof item.selectedColor === 'string') {
+      normalizedColor = item.selectedColor;
+    } else if (item.selectedColor.name) {
+      normalizedColor = item.selectedColor.name;
+    } else if (item.selectedColor.value) {
+      normalizedColor = item.selectedColor.value;
+    }
+  } else if (item.color) {
+    if (typeof item.color === 'string') {
+      normalizedColor = item.color;
+    } else if (item.color.name) {
+      normalizedColor = item.color.name;
+    } else if (item.color.value) {
+      normalizedColor = item.color.value;
+    }
+  }
+
   const normalized = {
     id: item.id || item.productId || item._id,
     productId: item.id || item.productId || item._id,
@@ -101,7 +132,7 @@ async function addItem(item) {
     price: item.salePrice || item.price || item.originalPrice || 0,
     quantity: item.quantity || item.qty || 1,
     selectedSize: item.selectedSize || item.size || null,
-    selectedColor: item.selectedColor || item.color || null,
+    selectedColor: normalizedColor,
     snapshot: item.snapshot || null,
     image: item.image || (item.images && item.images[0]) || null
   };
@@ -127,6 +158,7 @@ async function addItem(item) {
       const cart = _readLocal();
       const key = _makeKey(normalized);
       const existing = cart.items.find(i => _makeKey(i) === key);
+      
       if (existing) {
         existing.quantity = (existing.quantity || 0) + normalized.quantity;
       } else {
@@ -142,6 +174,7 @@ async function addItem(item) {
   const cart = _readSession();
   const key = _makeKey(normalized);
   const existing = cart.items.find(i => _makeKey(i) === key);
+  
   if (existing) {
     existing.quantity = (existing.quantity || 0) + normalized.quantity;
   } else {

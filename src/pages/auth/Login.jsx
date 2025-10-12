@@ -42,10 +42,28 @@ const Login = () => {
             try { localStorage.removeItem('user'); localStorage.removeItem('token'); } catch (e) {}
           }
         } catch (e) {}
+        
+        // Determine redirect based on user role
+        const userRole = user?.role || 'customer';
+        const isAdminUser = ['staff', 'manager', 'admin'].includes(userRole);
+        const redirectPath = isAdminUser ? '/admin-panel' : '/user-dashboard';
+        
+        // Debug: Log user info
+        console.log('🔍 Login Debug:', {
+          user,
+          userRole,
+          isAdminUser,
+          redirectPath
+        });
+        
         // show success then redirect
         setFormError('');
-        toast.push({ title: 'Đăng nhập thành công', message: 'Đang chuyển hướng...', type: 'success' });
-        setTimeout(() => navigate('/user-dashboard'), 800);
+        toast.push({ 
+          title: 'Đăng nhập thành công', 
+          message: isAdminUser ? 'Chào mừng đến trang quản trị!' : 'Đang chuyển hướng...', 
+          type: 'success' 
+        });
+        setTimeout(() => navigate(redirectPath), 800);
       })
       .catch(err => {
         console.error('Login error:', err);

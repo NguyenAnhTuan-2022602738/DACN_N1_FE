@@ -4,10 +4,34 @@ import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
 
-const CartItem = ({ item, onUpdateQuantity, onRemove, onSaveForLater, onMoveToWishlist }) => {
+const CartItem = ({ item, onUpdateQuantity, onUpdateSizeColor, onRemove, onSaveForLater, onMoveToWishlist }) => {
   const handleQuantityChange = (newQuantity) => {
     if (newQuantity < 1) return;
     onUpdateQuantity(item?.id, newQuantity);
+  };
+
+  const handleInputChange = (e) => {
+    const val = parseInt(e.target.value);
+    if (!isNaN(val) && val > 0) {
+      onUpdateQuantity(item?.id, val);
+    }
+  };
+
+  const handleInputBlur = (e) => {
+    // Khi blur, nếu rỗng hoặc không hợp lệ thì đặt về 1
+    if (e.target.value === '' || parseInt(e.target.value) < 1) {
+      onUpdateQuantity(item?.id, 1);
+    }
+  };
+
+  const handleSizeChange = (e) => {
+    const newSize = e.target.value;
+    onUpdateSizeColor(item?.id, newSize, item?.selectedColor || item?.color);
+  };
+
+  const handleColorChange = (e) => {
+    const newColor = e.target.value;
+    onUpdateSizeColor(item?.id, item?.selectedSize || item?.size, newColor);
   };
 
   const formatPrice = (price) => {
@@ -21,7 +45,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemove, onSaveForLater, onMoveToWi
     <div className="flex flex-col sm:flex-row gap-4 p-4 bg-card border border-border rounded-lg">
       {/* Product Image */}
       <div className="flex-shrink-0">
-        <Link to={`/product-detail?id=${item?.id}`}>
+        <Link to={`/product-detail?id=${item?.productId || item?.id}`}>
           <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg overflow-hidden bg-muted">
             <Image
               src={item?.image}
@@ -36,22 +60,75 @@ const CartItem = ({ item, onUpdateQuantity, onRemove, onSaveForLater, onMoveToWi
         <div className="flex flex-col sm:flex-row sm:justify-between gap-2">
           <div className="flex-1">
             <Link 
-              to={`/product-detail?id=${item?.id}`}
+              to={`/product-detail?id=${item?.productId || item?.id}`}
               className="font-medium text-foreground hover:text-accent transition-colors line-clamp-2"
             >
               {item?.name}
             </Link>
-            <div className="flex flex-wrap gap-2 mt-1 text-sm text-muted-foreground">
-              <span>Màu: {item?.color}</span>
-              <span>•</span>
-              <span>Size: {item?.size}</span>
+            
+            {/* Size and Color Selectors */}
+            <div className="flex flex-wrap gap-3 mt-2">
+              {/* Color - Always show if exists */}
+              {(item?.selectedColor || item?.color) && (
+                <div className="flex items-center gap-2">
+                  {item?.availableColors && item?.availableColors?.length > 0 ? (
+                    <>
+                      <label className="text-sm text-muted-foreground">Màu:</label>
+                      <select
+                        value={item?.selectedColor || item?.color || ''}
+                        onChange={handleColorChange}
+                        className="px-2 py-1 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        {item?.availableColors?.map((color) => (
+                          <option key={color} value={color}>
+                            {color}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      Màu: {item?.selectedColor || item?.color}
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* Size - Always show if exists */}
+              {(item?.selectedSize || item?.size) && (
+                <div className="flex items-center gap-2">
+                  {item?.availableSizes && item?.availableSizes?.length > 0 ? (
+                    <>
+                      <label className="text-sm text-muted-foreground">Size:</label>
+                      <select
+                        value={item?.selectedSize || item?.size || ''}
+                        onChange={handleSizeChange}
+                        className="px-2 py-1 text-sm border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        {item?.availableSizes?.map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      Size: {item?.selectedSize || item?.size}
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              {/* Brand */}
               {item?.brand && (
-                <>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>•</span>
                   <span>Thương hiệu: {item?.brand}</span>
-                </>
+                </div>
               )}
             </div>
+            
             {item?.inStock ? (
               <span className="inline-flex items-center gap-1 text-sm text-success mt-1">
                 <Icon name="Check" size={14} />
@@ -93,9 +170,15 @@ const CartItem = ({ item, onUpdateQuantity, onRemove, onSaveForLater, onMoveToWi
               >
                 <Icon name="Minus" size={14} />
               </Button>
-              <span className="px-3 py-1 text-sm font-medium min-w-[3rem] text-center">
-                {item?.quantity}
-              </span>
+              <input
+                type="number"
+                value={item?.quantity}
+                onChange={handleInputChange}
+                onBlur={handleInputBlur}
+                className="w-16 px-2 py-1 text-sm font-medium text-center bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                min="1"
+                placeholder="1"
+              />
               <Button
                 variant="ghost"
                 size="sm"

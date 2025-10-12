@@ -6,6 +6,8 @@ import Button from '../../../components/ui/Button';
 import ConfirmModal from '../../../components/ui/ConfirmModal';
 import { useToast } from '../../../components/ui/ToastProvider';
 import { useWishlist } from '../../../contexts/WishlistContext';
+import cart from '../../../lib/cart';
+import API from '../../../lib/api';
 
 const WishlistSection = () => {
   const toast = useToast();
@@ -15,6 +17,7 @@ const WishlistSection = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [productStockMap, setProductStockMap] = useState({}); // Map product_id -> stock info
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -31,17 +34,80 @@ const WishlistSection = () => {
     });
   };
 
+  // Fetch stock info from database for all wishlist products
+  useEffect(() => {
+    const fetchStockInfo = async () => {
+      if (!wishlistItems || wishlistItems.length === 0) return;
+
+      try {
+        // Get all unique product IDs
+        const productIds = wishlistItems
+          .map(item => item.product_id)
+          .filter(id => id); // Remove null/undefined
+
+        if (productIds.length === 0) return;
+
+        // Fetch products from API
+        const stockMap = {};
+        await Promise.all(
+          productIds.map(async (productId) => {
+            try {
+              const res = await API.get(`/api/products/${productId}`);
+              const product = res?.data?.product || res?.data;
+              if (product) {
+                stockMap[productId] = {
+                  stock_quantity: product.stock_quantity || 0,
+                  status: product.status || 'active',
+                  inStock: product.status === 'active' && (product.stock_quantity || 0) > 0
+                };
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch product ${productId}:`, err);
+              // Default to out of stock if fetch fails
+              stockMap[productId] = {
+                stock_quantity: 0,
+                status: 'inactive',
+                inStock: false
+              };
+            }
+          })
+        );
+
+        setProductStockMap(stockMap);
+      } catch (error) {
+        console.error('Error fetching stock info:', error);
+      }
+    };
+
+    fetchStockInfo();
+  }, [wishlistItems]);
+
   // Map wishlist items from context to display format
-  const displayItems = wishlistItems.map(item => ({
-    id: item.product_id?.toString() || item._id?.toString(),
-    name: item.snapshot?.name || 'Sản phẩm',
-    brand: item.snapshot?.brand,
-    image: item.snapshot?.image,
-    price: item.snapshot?.price || 0,
-    originalPrice: item.snapshot?.originalPrice,
-    category: item.snapshot?.category,
-    addedDate: item.created_at || item.createdAt
-  }));
+  const displayItems = wishlistItems.map(item => {
+    const productId = item.product_id?.toString();
+    const stockInfo = productStockMap[productId] || {
+      stock_quantity: 0,
+      status: 'inactive',
+      inStock: false
+    };
+    
+    return {
+      id: productId,
+      productId: productId, // For linking to product detail
+      name: item.snapshot?.name || 'Sản phẩm',
+      brand: item.snapshot?.brand,
+      image: item.snapshot?.image,
+      price: item.snapshot?.price || 0,
+      originalPrice: item.snapshot?.originalPrice,
+      category: item.snapshot?.category,
+      size: item.snapshot?.size,
+      color: item.snapshot?.color,
+      stock_quantity: stockInfo.stock_quantity,
+      status: stockInfo.status,
+      inStock: stockInfo.inStock,
+      addedDate: item.created_at || item.createdAt
+    };
+  });
 
   // Handle remove single item
   const handleRemoveItem = (itemId) => {
@@ -120,14 +186,33 @@ const WishlistSection = () => {
     }
   };
 
-  const handleAddToCart = (item) => {
-    // Mock add to cart functionality
-    console.log('Added to cart:', item);
-    toast.push({
-      title: 'Thành công!',
-      message: `Đã thêm "${item.name}" vào giỏ hàng`,
-      type: 'success'
-    });
+  const handleAddToCart = async (item) => {
+    try {
+      // Tạo object giống như ProductInfo để cart.addItem() có thể merge đúng
+      await cart.addItem({
+        id: item.productId,
+        productId: item.productId,
+        name: item.name,
+        price: item.price,
+        image: item.image,
+        selectedSize: item.size || null,
+        selectedColor: item.color || null,
+        quantity: 1
+      });
+      
+      toast.push({
+        title: 'Thành công!',
+        message: `Đã thêm "${item.name}" vào giỏ hàng`,
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.push({
+        title: 'Có lỗi xảy ra',
+        message: 'Không thể thêm sản phẩm vào giỏ hàng',
+        type: 'error'
+      });
+    }
   };
 
   return (
@@ -217,8 +302,11 @@ const WishlistSection = () => {
                 viewMode === 'list' ? 'flex' : ''
               }`}
             >
-              {/* Product Image */}
-              <div className={`relative ${viewMode === 'list' ? 'w-32 h-32 flex-shrink-0' : 'aspect-square'}`}>
+              {/* Product Image with Link */}
+              <Link 
+                to={`/product-detail?id=${item?.productId}`}
+                className={`relative block ${viewMode === 'list' ? 'w-32 h-32 flex-shrink-0' : 'aspect-square'}`}
+              >
                 <div className="w-full h-full overflow-hidden">
                   <Image
                     src={item?.image}
@@ -234,7 +322,7 @@ const WishlistSection = () => {
                   </div>
                 )}
                 
-                {/* Stock Status */}
+                {/* Stock Status Badge */}
                 {!item?.inStock && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                     <span className="bg-error text-error-foreground px-3 py-1 rounded-full text-sm font-medium">
@@ -243,22 +331,36 @@ const WishlistSection = () => {
                   </div>
                 )}
                 
-                {/* Selection Checkbox */}
-                <div className="absolute top-2 right-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedItems?.includes(item?.id)}
-                    onChange={() => handleSelectItem(item?.id)}
-                    className="w-4 h-4 text-accent focus:ring-accent rounded"
-                  />
-                </div>
+                {item?.inStock && (
+                  <div className="absolute bottom-2 left-2">
+                    <span className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
+                      Còn hàng
+                    </span>
+                  </div>
+                )}
+              </Link>
+              
+              {/* Selection Checkbox */}
+              <div className="absolute top-2 right-2">
+                <input
+                  type="checkbox"
+                  checked={selectedItems?.includes(item?.id)}
+                  onChange={() => handleSelectItem(item?.id)}
+                  className="w-4 h-4 text-accent focus:ring-accent rounded"
+                />
               </div>
 
               {/* Product Info */}
               <div className={`p-4 ${viewMode === 'list' ? 'flex-1' : ''}`}>
                 <div className={viewMode === 'list' ? 'flex justify-between items-start' : ''}>
                   <div className={viewMode === 'list' ? 'flex-1 pr-4' : ''}>
-                    <h3 className="font-medium text-foreground mb-2 line-clamp-2">{item?.name}</h3>
+                    {/* Product Name with Link */}
+                    <Link 
+                      to={`/product-detail?id=${item?.productId}`}
+                      className="block hover:text-primary transition-colors"
+                    >
+                      <h3 className="font-medium text-foreground mb-2 line-clamp-2">{item?.name}</h3>
+                    </Link>
                     
                     {/* Price */}
                     <div className="flex items-center space-x-2 mb-2">
@@ -272,8 +374,8 @@ const WishlistSection = () => {
                     
                     {/* Product Details */}
                     <div className="text-xs text-muted-foreground mb-3 space-y-1">
-                      <p>Kích thước: {item?.sizes?.join(', ')}</p>
-                      <p>Màu sắc: {item?.colors?.join(', ')}</p>
+                      {item?.size && <p>Kích thước: {item.size}</p>}
+                      {item?.color && <p>Màu sắc: {item.color}</p>}
                       <p>Thêm vào: {formatDate(item?.addedDate)}</p>
                     </div>
                   </div>

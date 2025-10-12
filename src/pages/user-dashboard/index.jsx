@@ -11,12 +11,17 @@ import AccountSettings from './components/AccountSettings';
 import LoyaltyProgram from './components/LoyaltyProgram';
 import Checkout from '../checkout';
 import API from '../../lib/api';
+import { useRole } from '../../hooks/useRole';
 
 const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { role, isAdmin, isManager } = useRole();
+  
+  // Check if user has admin access (staff, manager, or admin)
+  const hasAdminAccess = ['staff', 'manager', 'admin'].includes(role);
 
   const menuItems = [
     { id: 'profile', label: 'Thông tin cá nhân', icon: 'User' },
@@ -130,8 +135,30 @@ const UserDashboard = () => {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between">
               <div className="mb-4 lg:mb-0">
                 <h1 className="text-2xl lg:text-3xl font-bold mb-2">Chào mừng trở lại!</h1>
-                <p className="text-lg opacity-90">{currentUser?.name || currentUser?.email || 'Bạn'}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-lg opacity-90">{currentUser?.name || currentUser?.email || 'Bạn'}</p>
+                  {hasAdminAccess && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/20 text-white border border-white/30">
+                      {role === 'admin' && '👑 Admin'}
+                      {role === 'manager' && '⭐ Manager'}
+                      {role === 'staff' && '💼 Staff'}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm opacity-75">{currentUser?.createdAt ? `Thành viên từ tháng ${new Date(currentUser.createdAt).getMonth() + 1} năm ${new Date(currentUser.createdAt).getFullYear()}` : ''}</p>
+                
+                {/* Admin Access Button */}
+                {hasAdminAccess && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/admin-panel')}
+                    className="mt-3 bg-white/10 hover:bg-white/20 border-white/30 text-white"
+                  >
+                    <Icon name="Shield" size={16} className="mr-2" />
+                    Chuyển sang Quản trị
+                  </Button>
+                )}
               </div>
               
               {/* Quick Stats */}

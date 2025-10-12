@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from '../../components/ui/Header';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
@@ -11,25 +11,63 @@ import TopProduct from './components/TopProduct';
 import UserManagement from './components/UserManagement';
 import ProductsList from '../admin/ProductsList';
 import ProductForm from '../admin/ProductForm';
-import { useNavigate } from 'react-router-dom';
+import CategoryList from '../admin/CategoryList';
+import CategoryForm from '../admin/CategoryForm';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useRole } from '../../hooks/useRole';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [currentUser] = useState({
-    name: "Nguyễn Văn Admin",
-    role: "admin",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg"
-  });
+  const { user, role, permissions, isAdmin, isManager } = useRole();
   const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
 
-  const tabs = [
-    { id: 'dashboard', label: 'Tổng quan', icon: 'BarChart3' },
-    { id: 'orders', label: 'Đơn hàng', icon: 'Package' },
-    { id: 'products', label: 'Sản phẩm', icon: 'ShoppingBag' },
-    { id: 'users', label: 'Người dùng', icon: 'Users' },
-    { id: 'analytics', label: 'Phân tích', icon: 'TrendingUp' },
-    { id: 'settings', label: 'Cài đặt', icon: 'Settings' }
+  // Sync activeTab with URL query param or state
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
+  // Update URL when activeTab changes
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    // Update URL with query param
+    navigate(`/admin-panel?tab=${tabId}`, { replace: true });
+  };
+
+  // Get user display name
+  const currentUser = useMemo(() => ({
+    name: user?.fullName || user?.username || user?.email || "Admin User",
+    role: role,
+    avatar: user?.avatar || "https://randomuser.me/api/portraits/men/1.jpg"
+  }), [user, role]);
+
+  // Define role labels in Vietnamese
+  const roleLabels = {
+    staff: 'Nhân viên',
+    manager: 'Quản lý',
+    admin: 'Quản trị viên'
+  };
+
+  // Define all tabs with role requirements
+  const allTabs = [
+    { id: 'dashboard', label: 'Tổng quan', icon: 'BarChart3', roles: ['staff', 'manager', 'admin'] },
+    { id: 'orders', label: 'Đơn hàng', icon: 'Package', roles: ['staff', 'manager', 'admin'] },
+    { id: 'products', label: 'Sản phẩm', icon: 'ShoppingBag', roles: ['staff', 'manager', 'admin'] },
+    { id: 'categories', label: 'Danh mục', icon: 'Folder', roles: ['staff', 'manager', 'admin'] },
+    { id: 'analytics', label: 'Phân tích', icon: 'TrendingUp', roles: ['manager', 'admin'] },
+    { id: 'users', label: 'Người dùng', icon: 'Users', roles: ['admin'] },
+    { id: 'settings', label: 'Cài đặt', icon: 'Settings', roles: ['admin'] }
   ];
+
+  // Filter tabs based on user role
+  const tabs = useMemo(() => {
+    return allTabs.filter(tab => tab.roles.includes(role));
+  }, [role]);
 
   const statsData = [
     {
@@ -114,6 +152,13 @@ const AdminPanel = () => {
           </div>
         );
 
+      case 'categories':
+        return (
+          <div className="space-y-6">
+            <CategoryList />
+          </div>
+        );
+
       case 'users':
         return (
           <div className="space-y-6">
@@ -153,16 +198,28 @@ const AdminPanel = () => {
               <div>
                 <h1 className="text-3xl font-bold text-foreground">Bảng điều khiển quản trị</h1>
                 <p className="text-muted-foreground mt-1">
-                  Chào mừng trở lại, {currentUser?.name}
+                  Chào mừng trở lại, {currentUser?.name} ({roleLabels[role] || role})
                 </p>
               </div>
               <div className="flex items-center space-x-4">
-                <Button variant="outline" iconName="Download" iconPosition="left">
-                  Xuất báo cáo
+                <Button 
+                  variant="outline" 
+                  iconName="User" 
+                  iconPosition="left"
+                  onClick={() => navigate('/user-dashboard')}
+                >
+                  Dashboard Cá nhân
                 </Button>
-                <Button variant="default" iconName="Plus" iconPosition="left" onClick={() => navigate('/admin/products/new')}>
-                  Thêm mới
-                </Button>
+                {permissions.canViewSalesReports && (
+                  <Button variant="outline" iconName="Download" iconPosition="left">
+                    Xuất báo cáo
+                  </Button>
+                )}
+                {permissions.canCreateProduct && (
+                  <Button variant="default" iconName="Plus" iconPosition="left" onClick={() => navigate('/admin-panel/products/new')}>
+                    Thêm mới
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -174,10 +231,11 @@ const AdminPanel = () => {
                 {tabs?.map((tab) => (
                   <button
                     key={tab?.id}
-                    onClick={() => setActiveTab(tab?.id)}
+                    onClick={() => handleTabChange(tab?.id)}
                     className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-smooth ${
                       activeTab === tab?.id
-                        ? 'border-accent text-accent' :'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                        ? 'border-accent text-accent' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                     }`}
                   >
                     <Icon name={tab?.icon} size={16} />

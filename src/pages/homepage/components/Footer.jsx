@@ -60,80 +60,103 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-primary text-primary-foreground">
+    <footer className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      {/* Decorative Elements */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-600/20 to-purple-600/20 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-emerald-600/20 to-blue-600/20 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
+      </div>
+      
       {/* Main Footer Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Company Info */}
-          <div className="lg:col-span-1">
-            <Link to="/homepage" className="flex items-center space-x-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-accent to-warning rounded-lg flex items-center justify-center">
-                <Icon name="Sparkles" size={24} color="white" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-12 gap-8">
+          {/* Company Info - wider column */}
+          <div className="md:col-span-1 lg:col-span-3 space-y-6">
+            <Link to="/homepage" className="inline-flex items-center space-x-3 group">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+                <Icon name="Sparkles" size={28} color="white" />
               </div>
               <div className="flex flex-col">
-                <span className="font-accent font-bold text-xl text-primary-foreground leading-none">
+                <span className="font-bold text-2xl text-white leading-none">
                   ABC Fashion
                 </span>
-                <span className="text-sm text-primary-foreground/80 leading-none">
+                <span className="text-blue-300 text-sm leading-none">
                   Store
                 </span>
               </div>
             </Link>
             
-            <p className="text-primary-foreground/80 mb-6 leading-relaxed">
+            <p className="text-slate-300 leading-relaxed">
               Điểm đến thời trang hàng đầu Việt Nam với hơn 50,000 khách hàng tin tưởng. 
               Chúng tôi mang đến những sản phẩm chất lượng cao với giá cả hợp lý.
             </p>
 
+            {/* Socials */}
+            <div className="flex items-center gap-3">
+              {[
+                { icon: 'Facebook', href: '#', color: 'hover:bg-blue-600' },
+                { icon: 'Instagram', href: '#', color: 'hover:bg-pink-600' },
+                { icon: 'Youtube', href: '#', color: 'hover:bg-red-600' },
+                { icon: 'Music', href: '#', color: 'hover:bg-black' },
+              ].map((s, i) => (
+                <a key={i} href={s.href} className={`inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 ${s.color} transition-all duration-300 hover:scale-110 hover:shadow-lg`}>
+                  <Icon name={s.icon} size={18} color="white" />
+                </a>
+              ))}
+            </div>
+
             {/* Contact Info */}
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Icon name="MapPin" size={16} className="text-accent" />
+              <div className="flex items-center gap-3 text-slate-300">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <Icon name="MapPin" size={16} className="text-blue-400" />
+                </div>
                 <span className="text-sm">123 Nguyễn Huệ, Q1, TP.HCM</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Icon name="Phone" size={16} className="text-accent" />
+              <div className="flex items-center gap-3 text-slate-300">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <Icon name="Phone" size={16} className="text-green-400" />
+                </div>
                 <span className="text-sm">1900 1234</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Icon name="Mail" size={16} className="text-accent" />
+              <div className="flex items-center gap-3 text-slate-300">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <Icon name="Mail" size={16} className="text-purple-400" />
+                </div>
                 <span className="text-sm">support@abcfashion.vn</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Icon name="Clock" size={16} className="text-accent" />
+              <div className="flex items-center gap-3 text-slate-300">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                  <Icon name="Clock" size={16} className="text-orange-400" />
+                </div>
                 <span className="text-sm">8:00 - 22:00 (Thứ 2 - CN)</span>
               </div>
             </div>
           </div>
 
           {/* Footer Links */}
-          {footerSections?.map((section, index) => (
-            <div key={index}>
-              <h3 className="font-semibold text-lg mb-4 text-primary-foreground">
+          {footerSections
+            ?.filter((section) => section?.title !== "Kết nối với chúng tôi")
+            ?.map((section, index) => (
+            <div key={index} className="md:col-span-1 lg:col-span-2 space-y-4">
+              <h3 className="font-semibold text-lg text-white relative">
                 {section?.title}
+                <div className="absolute -bottom-1 left-0 w-12 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
               </h3>
               <ul className="space-y-3">
                 {section?.links?.map((link, linkIndex) => (
                   <li key={linkIndex}>
-                    {section?.title === "Kết nối với chúng tôi" ? (
-                      <a
-                        href={link?.href}
-                        className="flex items-center gap-2 text-primary-foreground/80 hover:text-accent transition-colors duration-200"
-                      >
-                        {link?.icon && <Icon name={link?.icon} size={16} />}
-                        {link?.name}
-                      </a>
-                    ) : link?.href?.startsWith('/') ? (
+                    {link?.href?.startsWith('/') ? (
                       <Link
                         to={link?.href}
-                        className="text-primary-foreground/80 hover:text-accent transition-colors duration-200 block"
+                        className="text-slate-300 hover:text-white hover:translate-x-1 transition-all duration-200 block text-sm"
                       >
                         {link?.name}
                       </Link>
                     ) : (
                       <a
                         href={link?.href}
-                        className="text-primary-foreground/80 hover:text-accent transition-colors duration-200 block"
+                        className="text-slate-300 hover:text-white hover:translate-x-1 transition-all duration-200 block text-sm"
                       >
                         {link?.name}
                       </a>
@@ -143,87 +166,97 @@ const Footer = () => {
               </ul>
             </div>
           ))}
-        </div>
 
-        {/* Newsletter Signup */}
-        <div className="border-t border-primary-foreground/20 mt-12 pt-8">
-          <div className="max-w-md">
-            <h3 className="font-semibold text-lg mb-4 text-primary-foreground">
-              Đăng ký nhận tin khuyến mãi
+          {/* Newsletter as a column */}
+          <div className="md:col-span-1 lg:col-span-3 space-y-4">
+            <h3 className="font-semibold text-lg text-white relative">
+              Đăng ký nhận tin
+              <div className="absolute -bottom-1 left-0 w-12 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
             </h3>
-            <div className="flex gap-3">
+            <p className="text-slate-300 leading-relaxed text-sm">
+              Nhận voucher độc quyền và cập nhật sản phẩm mới mỗi tuần.
+            </p>
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-3">
               <input
                 type="email"
+                required
                 placeholder="Nhập email của bạn"
-                className="flex-1 px-4 py-2 rounded-lg bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground placeholder-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
               />
-              <button className="px-6 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors font-medium">
-                Đăng ký
+              <button className="w-full inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 hover:shadow-lg font-medium text-sm">
+                <Icon name="Send" size={16} className="mr-2" />
+                Đăng ký ngay
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>
       {/* Bottom Footer */}
-      <div className="border-t border-primary-foreground/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Payment Methods */}
-          <div className="mb-6">
-            <h4 className="font-medium mb-3 text-primary-foreground">Phương thức thanh toán</h4>
-            <div className="flex flex-wrap items-center gap-4">
-              {paymentMethods?.map((method, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 bg-primary-foreground/10 px-3 py-2 rounded-lg"
-                >
-                  <Icon name={method?.icon} size={16} className="text-accent" />
-                  <span className="text-sm text-primary-foreground/80">{method?.name}</span>
-                </div>
-              ))}
+      <div className="relative border-t border-white/10 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Payment Methods & Certifications side-by-side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+            <div>
+              <h4 className="font-semibold mb-4 text-white flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                Phương thức thanh toán
+              </h4>
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                {paymentMethods?.map((method, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 text-center"
+                  >
+                    <Icon name={method?.icon} size={16} className="text-blue-400" />
+                    <span className="text-xs text-slate-300 hidden sm:inline">{method?.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-
-          {/* Certifications */}
-          <div className="mb-6">
-            <h4 className="font-medium mb-3 text-primary-foreground">Chứng nhận</h4>
-            <div className="flex flex-wrap items-center gap-4">
-              {certifications?.map((cert, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 bg-primary-foreground/10 px-3 py-2 rounded-lg"
-                >
-                  <Icon name={cert?.icon} size={16} className="text-success" />
-                  <span className="text-sm text-primary-foreground/80">{cert?.name}</span>
-                </div>
-              ))}
+            <div>
+              <h4 className="font-semibold mb-4 text-white flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                Chứng nhận
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {certifications?.map((cert, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-2 rounded-lg hover:bg-white/20 transition-all duration-300"
+                  >
+                    <Icon name={cert?.icon} size={16} className="text-green-400" />
+                    <span className="text-xs text-slate-300">{cert?.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Copyright */}
-          <div className="flex flex-col md:flex-row items-center justify-between pt-6 border-t border-primary-foreground/20">
-            <div className="text-sm text-primary-foreground/80 mb-4 md:mb-0">
+          <div className="flex flex-col md:flex-row items-center justify-between pt-6 border-t border-white/10">
+            <div className="text-sm text-slate-400 mb-4 md:mb-0">
               © {currentYear} ABC Fashion Store. Tất cả quyền được bảo lưu.
             </div>
             
-            <div className="flex items-center gap-6 text-sm text-primary-foreground/80">
-              <a href="#" className="hover:text-accent transition-colors">
+            <div className="flex items-center gap-6 text-sm text-slate-400">
+              <a href="#" className="hover:text-white transition-colors">
                 Chính sách bảo mật
               </a>
-              <a href="#" className="hover:text-accent transition-colors">
+              <a href="#" className="hover:text-white transition-colors">
                 Điều khoản sử dụng
               </a>
-              <a href="#" className="hover:text-accent transition-colors">
+              <a href="#" className="hover:text-white transition-colors">
                 Sitemap
               </a>
             </div>
           </div>
 
           {/* Business Registration */}
-          <div className="mt-4 pt-4 border-t border-primary-foreground/20 text-xs text-primary-foreground/60 text-center">
+          <div className="mt-6 pt-6 border-t border-white/10 text-xs text-slate-500 text-center space-y-1">
             <p>
               Công ty TNHH ABC Fashion Store - GPKD số 0123456789 do Sở KH&ĐT TP.HCM cấp ngày 01/01/2020
             </p>
-            <p className="mt-1">
+            <p>
               Địa chỉ: 123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM - Điện thoại: 1900 1234
             </p>
           </div>

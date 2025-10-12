@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import cart from '../../../lib/cart';
 import API from '../../../lib/api';
 import { useToast } from '../../../components/ui/ToastProvider';
@@ -18,6 +18,19 @@ const ProductInfo = ({ product, onAddToWishlist }) => {
 
   const sizes = product?.sizes || [];
   const colors = product?.colors || [];
+
+  // Auto-select first size and color when product loads
+  useEffect(() => {
+    if (sizes.length > 0 && !selectedSize) {
+      setSelectedSize(sizes[0]);
+    }
+    if (colors.length > 0 && !selectedColor) {
+      // normalize to color name string if item is an object
+      const firstColor = colors[0];
+      setSelectedColor(typeof firstColor === 'string' ? firstColor : (firstColor?.name || firstColor?.value || ''));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product]);
 
   const handleSizeChange = (size) => {
     setSelectedSize(size);
@@ -69,7 +82,8 @@ const ProductInfo = ({ product, onAddToWishlist }) => {
         price: product.salePrice || product.price,
         image: imageUrl,
         selectedSize: selectedSize || null,
-        selectedColor: selectedColor || null,
+        // ensure we pass color as a string (name/value) for key matching
+        selectedColor: (typeof selectedColor === 'string' ? selectedColor : (selectedColor?.name || selectedColor?.value)) || null,
         quantity
       });
 
@@ -98,14 +112,20 @@ const ProductInfo = ({ product, onAddToWishlist }) => {
     const finalProductId = product?._id || product?.id;
 
     try {
-      // Use wishlist context
+      // Use wishlist context - pass complete snapshot with size, color, stock
       const wasAdded = await toggleWishlist(finalProductId, {
         name: product?.name,
         brand: product?.brand,
         image: product?.images?.[0]?.image_url || product?.images?.[0] || product?.image,
         price: product?.price,
         originalPrice: product?.originalPrice,
-        category: product?.category
+        category: product?.category,
+        // Add selected size and color
+        size: selectedSize || null,
+        color: selectedColor || null,
+        // Add stock info
+        stock_quantity: product?.stock_quantity || 0,
+        status: product?.status || 'active'
       });
 
       // Show toast
@@ -123,10 +143,10 @@ const ProductInfo = ({ product, onAddToWishlist }) => {
         });
       }
       
-      // Also call parent callback if provided
-      if (onAddToWishlist) {
-        onAddToWishlist();
-      }
+      // DO NOT call parent callback to avoid duplicate toast
+      // if (onAddToWishlist) {
+      //   onAddToWishlist();
+      // }
     } catch (error) {
       console.error('[ProductInfo Wishlist Error]', error.response?.data || error.message);
       toast.push({
@@ -253,15 +273,15 @@ const ProductInfo = ({ product, onAddToWishlist }) => {
             <div className="flex flex-wrap gap-2">
               {colors.map((color) => (
                 <button
-                  key={color.name}
-                  onClick={() => handleColorChange(color.name)}
+                  key={(typeof color === 'string' ? color : color.name)}
+                  onClick={() => handleColorChange(typeof color === 'string' ? color : color.name)}
                   className={`min-w-[80px] px-4 py-3 border-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedColor === color.name
+                    selectedColor === (typeof color === 'string' ? color : color.name)
                       ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm scale-105'
                       : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  {color.name}
+                  {typeof color === 'string' ? color : color.name}
                 </button>
               ))}
             </div>
@@ -284,22 +304,32 @@ const ProductInfo = ({ product, onAddToWishlist }) => {
                 type="number"
                 value={quantity}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value) || 1;
-                  if (val >= 1 && val <= 99) setQuantity(val);
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val > 0) {
+                    setQuantity(val);
+                  } else if (e.target.value === '') {
+                    // Cho phép xóa để nhập lại
+                    setQuantity('');
+                  }
                 }}
-                className="w-16 h-12 text-center text-lg font-semibold border-x-2 border-gray-200 focus:outline-none"
+                onBlur={(e) => {
+                  // Khi blur, nếu rỗng hoặc không hợp lệ thì đặt về 1
+                  if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                    setQuantity(1);
+                  }
+                }}
+                className="w-20 h-12 text-center text-lg font-semibold border-x-2 border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 min="1"
-                max="99"
+                placeholder="1"
               />
               <button
                 onClick={() => handleQuantityChange(1)}
-                disabled={quantity >= 99}
-                className="w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 <Icon name="Plus" size={18} />
               </button>
             </div>
-            <span className="text-sm text-gray-500">Tối đa 99 sản phẩm</span>
+            <span className="text-sm text-gray-500">Nhập số lượng mong muốn</span>
           </div>
         </div>
       </div>
